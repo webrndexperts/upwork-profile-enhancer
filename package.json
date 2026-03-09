@@ -1,0 +1,20 @@
+{
+  "name": "upwork-profile-optimizer",
+  "version": "1.0.0",
+  "description": "AI-powered Chrome extension for Upwork profile optimization",
+  "type": "module",
+  "scripts": {
+    "build:dev": "node scripts/build-config.js development",
+    "build:staging": "node scripts/build-config.js staging", 
+    "build:prod": "node scripts/build-config.js production",
+    "dev": "npm run build:dev && echo 'Development environment ready'",
+    "build": "npm run build:prod && echo 'Production build ready'",
+    "validate": "node scripts/validate-config.js"
+  },
+  "keywords": ["chrome-extension", "upwork", "ai", "gemini", "profile-optimizer"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.254"
+  }
+}
