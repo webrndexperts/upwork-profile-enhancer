@@ -1,49 +1,41 @@
 # RND Upwork Profile Optimizer
 
-AI-powered Chrome extension that analyzes Upwork freelancer profiles across 8 key sections and provides actionable improvement recommendations.
+AI-powered Chrome extension that analyzes Upwork freelancer profiles across 8 key sections and provides actionable improvement recommendations. Built with a **Zero-Trust, 100% Local Privacy Architecture**.
 
 ## Features
 
-- **8-Section Analysis** — Complete profile scoring system
-- **AI-Powered Insights** — Actionable recommendations via Gemini 2.5 Flash
-- **Smart Icon Display** — Appears only on Upwork profile pages when logged in
-- **Top 3 Priorities** — Ranked action plan with potential score improvements
-- **Score History** — Local storage of past analyses
-- **100% Free** — No paid tiers, no data collection
+- **8-Section Analysis** — Complete profile scoring system.
+- **Multi-AI Support** — Use either **Google Gemini 1.5 Flash** or **OpenAI GPT-4o**.
+- **100% Local Privacy** — No cloud storage. Your scores, profile URLs, and history never touch our servers.
+- **At-Rest Encryption** — API keys, session tokens, and scan history are **encrypted using AES-GCM** on your machine.
+- **Scan Cancellation** — Automatic background request termination if the sidebar is closed during a scan (saves API credits).
+- **Smart Icon Display** — Extension triggers only on legitimate Upwork profile pages.
+- **Score History** — Access past analyses locally, secured by disk-level encryption.
 
 ## Setup
 
-### 1. Get a Gemini API Key (Free)
-1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Create a free API key
-3. Copy it
+### 1. Get an API Key
+- **Gemini:** Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **OpenAI:** Visit [OpenAI Dashboard](https://platform.openai.com/api-keys)
 
 ### 2. Install the Extension
 1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable **Developer mode** (top right toggle)
-3. Click **Load unpacked**
-4. Select the `upwork-extension` folder
+2. Enable **Developer mode** (top right toggle).
+3. Click **Load unpacked**.
+4. Select the project folder.
 
-### 3. Add Your API Key
-1. Click the extension icon in your browser toolbar
-2. Click the ⚙️ Settings icon
-3. Paste your Gemini API key
-4. Click **Save API Key**
+### 3. Configure Settings
+1. Click the extension icon in your browser toolbar.
+2. Click the ⚙️ Settings icon.
+3. Toggle between Gemini or OpenAI.
+4. Paste your API key. (Key will be encrypted locally using your unique User ID).
+5. Click **Save Settings**.
 
 ### 4. Analyze a Profile
-1. Visit any Upwork freelancer profile (e.g., `upwork.com/freelancers/~...`)
-2. A floating **"Analyze Profile"** button will appear in the bottom-right corner
-3. Click it to open the analysis sidebar
-4. Click **Start Analysis**
-5. Wait ~10 seconds for results
-
-## Adding Your Logo
-
-Replace the placeholder icon files in `assets/icons/` with your actual logo:
-- `icon16.png` — 16×16px
-- `icon32.png` — 32×32px  
-- `icon48.png` — 48×48px
-- `icon128.png` — 128×128px
+1. Visit any Upwork freelancer profile.
+2. A floating **"Analyze Profile"** button will appear in the bottom-right corner.
+3. Click it to open the analysis sidebar.
+4. Click **Start Analysis**.
 
 ## 8 Scoring Sections
 
@@ -57,28 +49,19 @@ Replace the placeholder icon files in `assets/icons/` with your actual logo:
 | Work History & Social Proof | 1.5 pts |
 | Rates & Availability | 0.5 pts |
 | Compliance & Optimization | 1.0 pts |
-| **Total** | **9.0 pts → /10** |
-
-## Score Categories
-
-| Score | Category | Meaning |
-|---|---|---|
-| 1–3 | Critical | Immediate attention required |
-| 4–6 | Good | Room for improvement |
-| 7–8 | Excellent | Strong performance |
-| 9–10 | Elite | Outstanding quality |
+| **Total** | **9.0 pts → Scaled /10** |
 
 ## Tech Stack
 
-- Manifest V3
-- Vanilla JS (content script, popup, sidebar)
-- Gemini 2.5 Flash API
-- Chrome Storage API
-- TailwindCSS-inspired custom CSS
+- **Manifest V3** — Modern Chrome Extension standards.
+- **Web Crypto API** — AES-GCM 256-bit encryption for local data at rest.
+- **Firebase Auth** — Secure local session management (No Firestore).
+- **PDF.js** — Local parsing of resume/portfolio uploads.
+- **Vanilla JS** — Performance-first, dependency-light architecture.
 
-## Privacy
+## Privacy & Security
 
-- All data processed locally
-- API key stored in Chrome's local storage only
-- No external data collection or tracking
-- Profile data sent only to Google's Gemini API for analysis
+- **Zero Cloud Storage:** We purged all Firestore logic. Your analysis results are never uploaded to a cloud database.
+- **Data Encryption:** All sensitive fields (API keys, history, session tokens) are "scrambled" on your disk using your unique Firebase UID as a derivation secret.
+- **Isolation:** Local storage is isolated to the extension; websites cannot access your data.
+- **Credit Protection:** Integrated `AbortController` terminates AI requests immediately if the UI is dismissed.
