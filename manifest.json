@@ -25,9 +25,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.upwork.com/*"],
-      "js": ["content/content.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "https://www.upwork.com/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -39,7 +45,7 @@
     "identity"
   ],
   "oauth2": {
-    "client_id": "712146270510-vtade2vhj70psr31of25mtm4h9jbmvem.apps.googleusercontent.com",
+    "client_id": "1038154364241-lq6hal2ueg57pgsrajasap13gotbcr78.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",
@@ -63,9 +69,13 @@
         "auth/auth.html",
         "auth/auth.css",
         "assets/icons/*",
-        "assets/images/*"
+        "assets/images/*",
+        "lib/vendor/*",
+        "lib/pdf-parser.js"
       ],
-      "matches": ["https://www.upwork.com/*"]
+      "matches": [
+        "https://www.upwork.com/*"
+      ]
     }
   ]
 }

@@ -15,12 +15,18 @@
   // Initialize
   init();
 
+  /**
+   * Entry point: detect login state, page type, and set up listeners.
+   */
   function init() {
     checkLoginAndPage();
     observeDOMChanges();
     setupMessageListener();
   }
 
+  /**
+   * Checks login state and profile page detection, toggles floating button.
+   */
   function checkLoginAndPage() {
     isLoggedIn = detectLogin();
     isProfilePage = detectProfilePage();
@@ -32,8 +38,12 @@
     }
   }
 
+  /**
+   * Detects if the user is logged in on Upwork using multiple selector strategies.
+   *
+   * @returns {boolean}
+   */
   function detectLogin() {
-    // Multiple detection methods for robustness
     const selectors = [
       '[data-test="nav-user-menu"]',
       '.nav-user-menu',
@@ -47,6 +57,11 @@
     return selectors.some(sel => document.querySelector(sel) !== null);
   }
 
+  /**
+   * Detects if the current page is a freelancer profile page.
+   *
+   * @returns {boolean}
+   */
   function detectProfilePage() {
     const url = window.location.href;
     return (
@@ -59,6 +74,9 @@
     );
   }
 
+  /**
+   * Creates and shows the floating "Analyze Profile Score" button.
+   */
   function showFloatingButton() {
     if (floatingBtn) return;
 
@@ -84,6 +102,9 @@
     });
   }
 
+  /**
+   * Hides and removes the floating button with a fade-out animation.
+   */
   function hideFloatingButton() {
     if (!floatingBtn) return;
     floatingBtn.classList.remove('rnd-btn-visible');
@@ -95,6 +116,9 @@
     }, 300);
   }
 
+  /**
+   * Handles click on the floating button — toggles or opens sidebar.
+   */
   function handleButtonClick() {
     if (sidebarFrame) {
       toggleSidebar();
@@ -103,6 +127,9 @@
     openSidebar();
   }
 
+  /**
+   * Opens the sidebar iframe with an overlay backdrop.
+   */
   function openSidebar() {
     // Create overlay
     const overlay = document.createElement('div');
@@ -136,6 +163,9 @@
     document.body.classList.add('rnd-sidebar-open');
   }
 
+  /**
+   * Closes the sidebar iframe and removes the overlay.
+   */
   function closeSidebar() {
     const overlay = document.getElementById('rnd-overlay');
     if (overlay) {
@@ -154,6 +184,9 @@
     document.body.classList.remove('rnd-sidebar-open');
   }
 
+  /**
+   * Toggles the sidebar open/closed.
+   */
   function toggleSidebar() {
     if (sidebarFrame) {
       closeSidebar();
@@ -162,6 +195,11 @@
     }
   }
 
+  /**
+   * Extracts profile data from the Upwork DOM.
+   *
+   * @returns {object} Extracted profile data
+   */
   function extractProfileData() {
     const data = {
       profileUrl: window.location.href,
@@ -291,8 +329,13 @@
     return data;
   }
 
+  /**
+   * Fallback extraction using page text patterns.
+   *
+   * @param {string} type - The data type to extract
+   * @returns {string} Extracted text
+   */
   function extractByPattern(type) {
-    // Fallback extraction using page text patterns
     const text = document.body.innerText;
     if (type === 'title') {
       const match = text.match(/^(.{10,80})\n/m);
@@ -301,6 +344,10 @@
     return '';
   }
 
+  /**
+   * Sets up message listeners for communication between content script,
+   * sidebar iframe, and background script.
+   */
   function setupMessageListener() {
     // Handle messages from popup (chrome.tabs.sendMessage)
     chrome.runtime.onMessage.addListener((message) => {
@@ -309,27 +356,67 @@
       }
     });
 
+    // Cache extension origin at script load to avoid hitting chrome.runtime
+    // when the extension context is invalidated (e.g. extension updated/reloaded).
+    let extensionOrigin = '';
+    try {
+      extensionOrigin = chrome.runtime.getURL('').replace(/\/$/, '');
+    } catch(e) { /* ignore */ }
+
     window.addEventListener('message', (event) => {
-      if (event.data?.type === 'CLOSE_SIDEBAR') {
-        closeSidebar();
-      }
-      if (event.data?.type === 'ANALYZE_REQUEST') {
-        const profileData = extractProfileData();
-        chrome.runtime.sendMessage({
-          type: 'ANALYZE_PROFILE',
-          data: profileData
-        }, (response) => {
-          if (sidebarFrame) {
-            sidebarFrame.contentWindow.postMessage({
-              type: 'ANALYSIS_RESULT',
-              data: response
-            }, '*');
+      try {
+        // Origin validation — only accept from our extension
+        if (event.origin !== extensionOrigin && event.origin !== window.location.origin) {
+          return;
+        }
+
+        if (event.data?.type === 'CLOSE_SIDEBAR') {
+          closeSidebar();
+        }
+        if (event.data?.type === 'ANALYZE_REQUEST') {
+          const profileData = extractProfileData();
+
+          // Pass along any document texts from the sidebar
+          if (event.data.resumeText) {
+            profileData.resumeText = event.data.resumeText;
           }
-        });
+          if (event.data.linkedinText) {
+            profileData.linkedinText = event.data.linkedinText;
+          }
+
+          chrome.runtime.sendMessage({
+            type: 'ANALYZE_PROFILE',
+            data: profileData
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+               console.warn('Analysis message failed:', chrome.runtime.lastError);
+               if (sidebarFrame) {
+                 sidebarFrame.contentWindow.postMessage({ type: 'ANALYSIS_ERROR', error: 'Connection failed' }, '*');
+               }
+               return;
+            }
+            if (sidebarFrame) {
+              sidebarFrame.contentWindow.postMessage({
+                type: 'ANALYSIS_RESULT',
+                data: response
+              }, '*');
+            }
+          });
+        }
+      } catch (err) {
+        if (err.message && err.message.includes('Extension context invalidated')) {
+          console.warn('RND Profile Optimizer: Extension was updated/reloaded. Please refresh the page to continue using the extension.');
+          if (sidebarFrame && sidebarFrame.contentWindow) {
+            sidebarFrame.contentWindow.postMessage({ type: 'ANALYSIS_ERROR', error: 'Extension updated. Please refresh the page.' }, '*');
+          }
+        }
       }
     });
   }
 
+  /**
+   * Observes DOM changes to detect login/logout and page navigation.
+   */
   function observeDOMChanges() {
     const observer = new MutationObserver(() => {
       const newLoginState = detectLogin();

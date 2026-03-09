@@ -1,10 +1,7 @@
-// firebase/firebase-auth.js
-// Handles Google Sign-In via chrome.identity + Firebase REST API + Firestore
-
-import { FIREBASE_CONFIG, GOOGLE_CLIENT_ID, COLLECTIONS } from './firebase-config.js';
+import { FIREBASE_CONFIG, GOOGLE_CLIENT_ID } from './firebase-config.js';
+import { encryptData, decryptData } from '../lib/crypto-utils.js';
 
 const FIREBASE_AUTH_URL  = `https://identitytoolkit.googleapis.com/v1`;
-const FIRESTORE_URL      = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
 
 // ─── GOOGLE SIGN IN ──────────────────────────────────────────────────────────
 
@@ -16,10 +13,7 @@ export async function signInWithGoogle() {
     // Step 2: Exchange Google token for Firebase ID token
     const firebaseUser = await exchangeTokenWithFirebase(token);
 
-    // Step 3: Save/update user in Firestore
-    await saveUserToFirestore(firebaseUser);
-
-    // Step 4: Store session locally
+    // Step 3: Store session locally
     await storeSession(firebaseUser);
 
     return { success: true, user: firebaseUser };
@@ -100,17 +94,21 @@ export async function signOut() {
 
 // ─── SESSION MANAGEMENT ───────────────────────────────────────────────────────
 
-export function storeSession(user) {
+export async function storeSession(user) {
+  const encryptedPayload = await encryptData(JSON.stringify({
+    email:       user.email,
+    displayName: user.displayName,
+    photoURL:    user.photoURL,
+    idToken:     user.idToken,
+    refreshToken:user.refreshToken,
+    expiresAt:   user.expiresAt
+  }), user.uid);
+
   return new Promise(resolve => {
     chrome.storage.local.set({
       rnd_user: {
-        uid:         user.uid,
-        email:       user.email,
-        displayName: user.displayName,
-        photoURL:    user.photoURL,
-        idToken:     user.idToken,
-        refreshToken:user.refreshToken,
-        expiresAt:   user.expiresAt
+        uid: user.uid,
+        session: encryptedPayload
       }
     }, resolve);
   });
@@ -118,8 +116,28 @@ export function storeSession(user) {
 
 export function getSession() {
   return new Promise(resolve => {
-    chrome.storage.local.get(['rnd_user'], result => {
-      resolve(result.rnd_user || null);
+    chrome.storage.local.get(['rnd_user'], async result => {
+      const data = result.rnd_user;
+      if (!data || !data.session) {
+        resolve(data || null);
+        return;
+      }
+
+      try {
+        const decrypted = await decryptData(data.session, data.uid);
+        if (!decrypted) {
+          resolve(null);
+          return;
+        }
+        const parsed = JSON.parse(decrypted);
+        resolve({
+          uid: data.uid,
+          ...parsed
+        });
+      } catch (e) {
+        console.error("Session decryption failed:", e);
+        resolve(null);
+      }
     });
   });
 }
@@ -175,109 +193,20 @@ async function refreshIdToken(refreshToken) {
   }
 }
 
-// ─── FIRESTORE OPERATIONS ─────────────────────────────────────────────────────
-
-export async function saveUserToFirestore(user) {
-  const docUrl = `${FIRESTORE_URL}/${COLLECTIONS.USERS}/${user.uid}`;
-
-  const payload = {
-    fields: {
-      uid:         { stringValue: user.uid },
-      email:       { stringValue: user.email },
-      displayName: { stringValue: user.displayName },
-      photoURL:    { stringValue: user.photoURL || '' },
-      lastLoginAt: { timestampValue: new Date().toISOString() },
-      createdAt:   { timestampValue: new Date().toISOString() }
-    }
-  };
-
-  // Use PATCH with updateMask so we don't overwrite createdAt on existing users
-  await fetch(`${docUrl}?updateMask.fieldPaths=uid&updateMask.fieldPaths=email&updateMask.fieldPaths=displayName&updateMask.fieldPaths=photoURL&updateMask.fieldPaths=lastLoginAt`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.idToken}`
-    },
-    body: JSON.stringify(payload)
-  });
-}
-
-export async function saveAnalysisToFirestore(uid, idToken, analysisData, profileUrl) {
-  const colUrl = `${FIRESTORE_URL}/${COLLECTIONS.USERS}/${uid}/${COLLECTIONS.ANALYSES}`;
-
-  const payload = {
-    fields: {
-      profileUrl:    { stringValue: profileUrl || '' },
-      overallScore:  { doubleValue: parseFloat(analysisData.overallScore) || 0 },
-      category:      { stringValue: analysisData.category || '' },
-      totalPoints:   { doubleValue: parseFloat(analysisData.totalPoints) || 0 },
-      maxPoints:     { doubleValue: parseFloat(analysisData.maxPoints) || 9 },
-      analysisData:  { stringValue: JSON.stringify(analysisData) },
-      createdAt:     { timestampValue: new Date().toISOString() }
-    }
-  };
-
-  const res = await fetch(colUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.error('Firestore save error:', err);
-    // Non-fatal — analysis still worked, just didn't save to cloud
+/**
+ * Permanently deletes the user's Firebase Auth account.
+ */
+export async function deleteAccount(idToken) {
+  try {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${FIREBASE_CONFIG.apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('Failed to delete account', e);
+    return false;
   }
-
-  return res.ok;
 }
 
-export async function getUserAnalyses(uid, idToken, limit = 10) {
-  const url = `${FIRESTORE_URL}/${COLLECTIONS.USERS}/${uid}/${COLLECTIONS.ANALYSES}?pageSize=${limit}&orderBy=createdAt+desc`;
-
-  const res = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${idToken}` }
-  });
-
-  if (!res.ok) return [];
-
-  const data = await res.json();
-  if (!data.documents) return [];
-
-  return data.documents.map(doc => {
-    const f = doc.fields;
-    return {
-      id:           doc.name.split('/').pop(),
-      profileUrl:   f.profileUrl?.stringValue || '',
-      overallScore: f.overallScore?.doubleValue || 0,
-      category:     f.category?.stringValue || '',
-      createdAt:    f.createdAt?.timestampValue || ''
-    };
-  });
-}
-
-export async function updateUserAnalysisCount(uid, idToken) {
-  // Increment total analyses counter on user document
-  const docUrl = `${FIRESTORE_URL}/${COLLECTIONS.USERS}/${uid}`;
-  const doc = await fetch(docUrl, {
-    headers: { 'Authorization': `Bearer ${idToken}` }
-  }).then(r => r.json()).catch(() => null);
-
-  const current = doc?.fields?.totalAnalyses?.integerValue || 0;
-
-  await fetch(`${docUrl}?updateMask.fieldPaths=totalAnalyses`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`
-    },
-    body: JSON.stringify({
-      fields: {
-        totalAnalyses: { integerValue: parseInt(current) + 1 }
-      }
-    })
-  });
-}
