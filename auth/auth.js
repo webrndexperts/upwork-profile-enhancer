@@ -1,5 +1,12 @@
 // auth.js — Login screen logic
 
+// CSP-safe replacement for inline onerror handlers
+window.addEventListener('error', e => {
+  if (e.target.tagName === 'IMG') {
+    e.target.style.display = 'none';
+  }
+}, true);
+
 document.getElementById('closeBtn').addEventListener('click', () => {
   window.parent.postMessage({ type: 'CLOSE_SIDEBAR' }, '*');
 });

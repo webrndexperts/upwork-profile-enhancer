@@ -71,3 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { el.textContent=''; el.className='s-msg'; }, 3000);
   }
 });
+
+// CSP-safe replacement for inline onerror handlers
+window.addEventListener('error', e => {
+  if (e.target.tagName === 'IMG') {
+    e.target.style.display = 'none';
+  }
+}, true);

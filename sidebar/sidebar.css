@@ -380,8 +380,10 @@ body {
 .settings-header-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .back-btn {
@@ -430,8 +432,24 @@ body {
 .get-key-link:hover { text-decoration: underline; }
 
 .input-wrap {
-  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
 }
+
+.key-save-btn {
+  background: var(--brand);
+  color: white;
+  border: none;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.key-save-btn:hover { background: var(--brand-dark); }
 
 .text-input {
   width: 100%;
@@ -1437,13 +1455,17 @@ body {
 .results-nav-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
+
 .results-nav-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
+  letter-spacing: -0.2px;
 }
 
 /* ==============================

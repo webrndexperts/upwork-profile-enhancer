@@ -142,6 +142,7 @@
     sidebarFrame.id = 'rnd-sidebar-frame';
     sidebarFrame.src = chrome.runtime.getURL('sidebar/sidebar.html');
     sidebarFrame.setAttribute('allowtransparency', 'true');
+    sidebarFrame.setAttribute('allow', 'clipboard-write');
     document.body.appendChild(sidebarFrame);
 
     // Collect profile data and send to iframe when ready

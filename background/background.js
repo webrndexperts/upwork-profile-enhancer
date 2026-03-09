@@ -152,14 +152,19 @@ async function handleGetHistory(sendResponse) {
     chrome.storage.local.get(['analysisHistory'], async r => {
       let history = r.analysisHistory || [];
       
-      // If encrypted, decrypt it
-      if (session && history.length > 0 && typeof history[0] !== 'object') {
+      // If encrypted (stored as object {iv, data}), decrypt it
+      if (session && history && !Array.isArray(history) && history.iv) {
         try {
           const decrypted = await decryptData(history, session.uid);
           history = JSON.parse(decrypted || '[]');
         } catch (e) {
           console.error("Failed to decrypt history:", e);
         }
+      }
+
+      // Ensure we have an array before sending response
+      if (!Array.isArray(history)) {
+        history = [];
       }
       
       sendResponse({ history, source: 'local' });
@@ -240,8 +245,8 @@ async function saveToLocalHistory(result, profileUrl) {
     chrome.storage.local.get(['analysisHistory'], async data => {
       let history = data.analysisHistory || [];
       
-      // If it's currently encrypted, decrypt it first to work with it
-      if (session && history.length > 0 && typeof history[0] !== 'object') {
+      // If it's currently encrypted (object {iv, data}), decrypt it first to work with it
+      if (session && history && !Array.isArray(history) && history.iv) {
         try {
           const decrypted = await decryptData(history, session.uid);
           history = JSON.parse(decrypted || '[]');
@@ -249,6 +254,11 @@ async function saveToLocalHistory(result, profileUrl) {
           console.error("Decrypt failed during save:", e);
           history = [];
         }
+      }
+      
+      // Safety: If for any reason history is not an array (e.g. decryption failed), reset it
+      if (!Array.isArray(history)) {
+        history = [];
       }
 
       history.unshift({
@@ -285,8 +295,8 @@ async function handleGetProfileHistory(profileUrl, sendResponse) {
   chrome.storage.local.get(['analysisHistory'], async r => {
     let all = r.analysisHistory || [];
     
-    // Decrypt if necessary
-    if (session && all.length > 0 && typeof all[0] !== 'object') {
+    // Decrypt if it's an encrypted object {iv, data}
+    if (session && all && !Array.isArray(all) && all.iv) {
       try {
         const decrypted = await decryptData(all, session.uid);
         all = JSON.parse(decrypted || '[]');
@@ -295,7 +305,12 @@ async function handleGetProfileHistory(profileUrl, sendResponse) {
         all = [];
       }
     }
-
+    
+    // Safety check: ensure 'all' is an array before filtering
+    if (!Array.isArray(all)) {
+      all = [];
+    }
+    
     const filtered = all.filter(a => a.profileUrl === profileUrl);
     sendResponse({ history: filtered, source: 'local' });
   });

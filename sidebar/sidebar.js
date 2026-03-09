@@ -104,6 +104,18 @@ async function init() {
 
   initUploadHandlers();
   initSectionToggleHandler();
+  initImageErrorHandlers();
+}
+
+/**
+ * CSP-safe replacement for inline onerror handlers.
+ */
+function initImageErrorHandlers() {
+  window.addEventListener('error', e => {
+    if (e.target.tagName === 'IMG') {
+      e.target.style.display = 'none';
+    }
+  }, true);
 }
 
 // ── Auth screen (iframe overlay) ──────────────────────────────────────────
@@ -204,13 +216,14 @@ $('signOutBtn').addEventListener('click', async () => {
   openAuthScreen();
 });
 
-// ── Header buttons ─────────────────────────────────────────────────────────
+// ── Top Navigation ─────────────────────────────────────────────────────────
+$('homeBtnSettings')?.addEventListener('click', () => show('ready'));
+$('homeBtnResults')?.addEventListener('click', () => show('ready'));
 $('closeBtn').addEventListener('click', () =>
   window.parent.postMessage({ type: 'CLOSE_SIDEBAR' }, '*'));
 
 $('settingsBtn').addEventListener('click', () => show('settings'));
-$('backBtn').addEventListener('click', () => show('ready'));
-$('backToHomeBtn').addEventListener('click', () => show('ready'));
+$('backBtn')?.addEventListener('click', () => show('ready'));
 $('goToSettingsLink')?.addEventListener('click', e => { e.preventDefault(); show('settings'); });
 
 // ── View Last Report ───────────────────────────────────────────────────
@@ -234,8 +247,7 @@ $('copyUrlBtn').addEventListener('click', () => {
   const url = $('profileUrl').href;
   if (url && url !== '#') {
     navigator.clipboard.writeText(url).then(() => {
-      $('copyUrlBtn').classList.add('copied');
-      setTimeout(() => $('copyUrlBtn').classList.remove('copied'), 1500);
+      showCopyFeedback($('copyUrlBtn'));
     });
   }
 });
@@ -260,19 +272,25 @@ document.querySelectorAll('.provider-tab').forEach(tab => {
   });
 });
 
-// Key removal handlers
+// Key management handlers
+$('saveGeminiBtn').addEventListener('click', saveGeminiApiKey);
+$('saveOpenAIBtn').addEventListener('click', saveOpenAIApiKey);
+
 $('removeGeminiBtn').addEventListener('click', () => {
-  $('geminiKeyInput').value = '';
-  saveAllSettings();
+  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { geminiApiKey: '' } }, () => {
+    showSaveMsg('Gemini key removed', 'ok');
+    loadSettings();
+  });
 });
 
 $('removeOpenAIBtn').addEventListener('click', () => {
-  $('openaiKeyInput').value = '';
-  saveAllSettings();
+  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { openaiApiKey: '' } }, () => {
+    showSaveMsg('OpenAI key removed', 'ok');
+    loadSettings();
+  });
 });
 
 // ── Settings & Account ─────────────────────────────────────────────────────
-$('saveApiBtn').addEventListener('click', saveAllSettings);
 
 // Confirmation Modal State Helper
 let pendingAction = null;
@@ -352,28 +370,28 @@ function loadSettings() {
 }
 
 /**
- * Saves all settings including API keys and provider/model selections.
+ * Saves Gemini API key independently.
  */
-function saveAllSettings() {
-  chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, res => {
-    const existingSettings = res || {};
-    
-    // Only update key if the input is visible and has a value
-    const newGemini = $('geminiInputState').style.display !== 'none' ? $('geminiKeyInput').value.trim() : existingSettings.geminiApiKey;
-    const newOpenAI = $('openaiInputState').style.display !== 'none' ? $('openaiKeyInput').value.trim() : existingSettings.openaiApiKey;
+function saveGeminiApiKey() {
+  const val = $('geminiKeyInput').value.trim();
+  if (!val) return showSaveMsg('Enter a valid key', 'err');
+  
+  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { geminiApiKey: val } }, () => {
+    showSaveMsg('Gemini key saved!', 'ok');
+    loadSettings();
+  });
+}
 
-    const settings = {
-      activeProvider,
-      selectedModel: $('modelSelect').value,
-      geminiApiKey:  newGemini,
-      openaiApiKey:  newOpenAI
-    };
-
-    chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings }, () => {
-      showSaveMsg('Settings saved!', 'ok');
-      loadSettings(); // Refresh UI to show saved states
-      checkApiKey();
-    });
+/**
+ * Saves OpenAI API key independently.
+ */
+function saveOpenAIApiKey() {
+  const val = $('openaiKeyInput').value.trim();
+  if (!val) return showSaveMsg('Enter a valid key', 'err');
+  
+  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { openaiApiKey: val } }, () => {
+    showSaveMsg('OpenAI key saved!', 'ok');
+    loadSettings();
   });
 }
 
@@ -698,10 +716,21 @@ function triggerAnalysis() {
     openAuthScreen();
     return;
   }
+
+  // Check if anything changed since last analysis
+  const currentHash = getInputHash();
+  if (lastResultData && lastResultData._hash === currentHash) {
+    renderResults(lastResultData, true);
+    if (lastResultData.suggestions) {
+      renderSuggestions(lastResultData.suggestions);
+    }
+    return;
+  }
+
   isAnalyzing = true;
   show('loading');
-
-  // Update loading step text to match selected provider
+  
+  // ... rest as before
   const providerText = $('loadingProviderText');
   if (providerText) {
     const name = activeProvider === 'openai' ? 'OpenAI' : 'Gemini AI';
@@ -710,7 +739,6 @@ function triggerAnalysis() {
 
   startLoadingSteps();
 
-  // Set timeout for long-running analysis
   if (analysisTimeout) clearTimeout(analysisTimeout);
   analysisTimeout = setTimeout(() => {
     if (isAnalyzing) {
@@ -721,7 +749,6 @@ function triggerAnalysis() {
     }
   }, ANALYSIS_TIMEOUT_MS);
 
-  // Send analysis request with optional document data
   window.parent.postMessage({
     type: 'ANALYZE_REQUEST',
     resumeText: resumeText || null,
@@ -773,6 +800,8 @@ function handleResult(response) {
   }
 
   if (response.success && response.data) {
+    const currentHash = getInputHash();
+    response.data._hash = currentHash;
     lastResultData = response.data;
     renderResults(response.data);
     if (response.data.suggestions) {
@@ -797,7 +826,7 @@ function handleResult(response) {
  *
  * @param {object} data - The analysis data object
  */
-function renderResults(data) {
+function renderResults(data, isCached = false) {
   show('results');
   const score  = parseFloat(data.overallScore) || 0;
   const cat    = data.category || scoreToCategory(score);
@@ -806,9 +835,16 @@ function renderResults(data) {
   if (scoreCard) scoreCard.className = `score-card cat-${cat.toLowerCase()}`;
   $('scoreNum').textContent      = score.toFixed(1);
   $('scoreCat').textContent      = cat;
+  
+  // Update header title if cached
+  const titleEl = document.querySelector('.results-nav-title');
+  if (titleEl) {
+    titleEl.textContent = isCached ? 'Analysis Results (No changes detected)' : 'Analysis Results';
+  }
+
   $('scoreDescText').textContent = data.categoryDescription || '';
-  $('scorePts').textContent      = data.totalPoints && data.maxPoints
-    ? `${parseFloat(data.totalPoints).toFixed(2)} / ${data.maxPoints} pts` : '';
+  
+  if ($('scorePts')) $('scorePts').style.display = 'none';
 
   const circ = 263.9;
   setTimeout(() => {
@@ -907,8 +943,7 @@ function renderSuggestions(data) {
     const text = btn.dataset.text;
     if (text) {
       navigator.clipboard.writeText(text).then(() => {
-        btn.classList.add('copied');
-        setTimeout(() => btn.classList.remove('copied'), 1500);
+        showCopyFeedback(btn);
       });
     }
   });
@@ -1100,10 +1135,59 @@ function escAttr(str) {
  * @param {string} text - Message text
  * @param {string} type - 'ok' or 'err'
  */
+/**
+ * Shows a message in the settings view.
+ * @param {string} text - Message text
+ * @param {string} type - 'ok' or 'err'
+ */
 function showSaveMsg(text, type) {
   const el = $('saveMsg');
+  if (!el) return;
   el.textContent = text; el.className = `save-msg ${type}`;
-  setTimeout(() => { el.textContent=''; el.className='save-msg'; }, 3000);
+  setTimeout(() => { if ($('saveMsg')) { el.textContent=''; el.className='save-msg'; } }, 3000);
+}
+
+/**
+ * Shows visual feedback after copying text.
+ * Swaps icon for a checkmark temporarily.
+ * @param {HTMLElement} btn - The button element
+ */
+function showCopyFeedback(btn) {
+  if (!btn) return;
+  const originalHtml = btn.innerHTML;
+  btn.classList.add('copied');
+  btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+  
+  setTimeout(() => {
+    btn.classList.remove('copied');
+    btn.innerHTML = originalHtml;
+  }, 1500);
+}
+
+/**
+ * Simple hash function for string comparison.
+ */
+function hashStr(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; 
+  }
+  return hash.toString();
+}
+
+/**
+ * Generates a unique hash for the current analysis inputs.
+ */
+function getInputHash() {
+  const inputs = {
+    p: profileData,
+    r: resumeText,
+    l: linkedinText,
+    provider: activeProvider
+  };
+  return hashStr(JSON.stringify(inputs));
 }
 
 // ── Start ──────────────────────────────────────────────────────────────────
