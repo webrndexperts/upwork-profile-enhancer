@@ -13,7 +13,7 @@
     <div class="sidebar-header">
       <div class="header-brand">
         <div class="brand-logo-wrap">
-          <img src="../assets/icons/icon48.png" alt="" class="brand-logo-img" onerror="this.style.display='none'">
+          <img src="../assets/icons/icon48.png" alt="" class="brand-logo-img">
           <svg class="brand-logo-fallback" width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
         </div>
         <div class="brand-text">
@@ -38,7 +38,7 @@
     <div class="user-bar" id="userBar" style="display:none">
       <div class="user-bar-left">
         <div class="user-avatar" id="userAvatar">
-          <img id="userAvatarImg" src="" alt="" onerror="this.style.display='none'">
+          <img id="userAvatarImg" src="" alt="">
           <span id="userAvatarInitial">?</span>
         </div>
         <div class="user-info">
@@ -204,8 +204,8 @@
       <!-- ===== SETTINGS VIEW ===== -->
       <div class="view" id="settingsView" style="display:none">
         <div class="settings-header-row">
-          <button class="back-btn" id="backBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <button class="back-btn" id="homeBtnSettings" title="Home">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </button>
           <span class="settings-title">Settings</span>
         </div>
@@ -230,7 +230,8 @@
               <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get free →</a>
             </div>
             <div class="input-wrap" id="geminiInputState">
-              <input type="password" id="geminiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false" style="padding-right:12px">
+              <input type="password" id="geminiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false">
+              <button class="key-save-btn" id="saveGeminiBtn">Save</button>
             </div>
             <div class="saved-key-wrap" id="geminiSavedState" style="display:none">
               <span class="saved-key-dots">••••••••••••••••••••••••••••••••</span>
@@ -248,7 +249,8 @@
               <a href="https://platform.openai.com/api-keys" target="_blank" class="get-key-link">Get key →</a>
             </div>
             <div class="input-wrap" id="openaiInputState">
-              <input type="password" id="openaiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false" style="padding-right:12px">
+              <input type="password" id="openaiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false">
+              <button class="key-save-btn" id="saveOpenAIBtn">Save</button>
             </div>
             <div class="saved-key-wrap" id="openaiSavedState" style="display:none">
               <span class="saved-key-dots">••••••••••••••••••••••••••••••••</span>
@@ -258,7 +260,6 @@
           </div>
         </div>
 
-        <button class="save-btn" id="saveApiBtn">Save Settings</button>
         <div class="save-msg" id="saveMsg"></div>
 
         <div class="form-divider"></div>
@@ -319,8 +320,8 @@
       <div class="view" id="resultsView" style="display:none">
 
         <div class="results-nav-row">
-          <button class="back-btn" id="backToHomeBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <button class="back-btn" id="homeBtnResults" title="Home">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </button>
           <span class="results-nav-title">Analysis Results</span>
         </div>
