@@ -1,4 +1,4 @@
-import { createProvider, checkRateLimit } from './api-handler.js';
+import { analyzeProfile, getBackendUsageCount } from './api-handler.js';
 import {
   signInWithGoogle,
   signOut,
@@ -6,7 +6,6 @@ import {
   getSession,
   deleteAccount
 } from '../firebase/firebase-auth.js';
-import { getFirestoreUsageCount, incrementFirestoreUsageCount } from '../firebase/firestore-usage.js';
 import { encryptData, decryptData } from '../lib/crypto-utils.js';
 import { CONFIG } from '../config/config.js';
 
@@ -82,74 +81,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 async function handleAnalysis(profileData, sendResponse) {
   try {
-    // Rate limit check
-    if (checkRateLimit()) {
-      sendResponse({ error: 'RATE_LIMITED', message: 'You have reached the maximum of 10 analyses per hour. Please wait before trying again.' });
-      return;
-    }
-
     const session = await getValidSession();
     if (!session) {
       sendResponse({ error: 'NOT_AUTHENTICATED', message: 'Please sign in to analyze profiles.' });
       return;
     }
 
-    // Free trial check (Firestore-backed)
-    if (!CONFIG.DEV_UNLIMITED_SCANS) {
-      const count = await getFirestoreUsageCount(session.uid, session.idToken);
-      if (count >= CONFIG.FREE_SCAN_LIMIT) {
-        sendResponse({
-          error: 'LIMIT_REACHED',
-          message: `You have used all ${CONFIG.FREE_SCAN_LIMIT} free scans. Upgrade to continue.`,
-          upgradeUrl: CONFIG.UPGRADE_URL
-        });
-        return;
-      }
-    }
-
     const settings = await getSettings();
     const provider = settings.activeProvider || 'gemini';
-    const apiKey   = provider === 'openai' ? CONFIG.OPENAI_API_KEY : CONFIG.GEMINI_API_KEY;
+    const model = settings.selectedModel || 'gemini-2.0-flash';
 
-    if (!apiKey) {
-      sendResponse({ error: 'NO_API_KEY', message: 'Please add your API key in Settings.' });
-      return;
-    }
-
-    // Extract document texts and top skills (sent from sidebar via content script)
+    // Extract document texts and top skills 
     const resumeText   = profileData.resumeText || null;
     const linkedinText = profileData.linkedinText || null;
     const topSkills    = profileData.topSkills || null;
 
-    // Remove extra fields from profileData to keep it clean for the DOM data
+    // Clean payload for the final scraping data
     const cleanProfileData = { ...profileData };
     delete cleanProfileData.resumeText;
     delete cleanProfileData.linkedinText;
     delete cleanProfileData.topSkills;
 
-    activeAbortController = new AbortController();
-    const signal = activeAbortController.signal;
+    // Send the analysis request to the secure PHP Backend Proxy
+    const result = await analyzeProfile(
+      cleanProfileData,
+      resumeText,
+      linkedinText,
+      topSkills,
+      provider,
+      model,
+      session.idToken
+    );
 
-    const ai     = createProvider(provider, settings.selectedModel);
-    const result = await ai.analyze(cleanProfileData, apiKey, resumeText, linkedinText, signal, 0, topSkills);
-
-    // Local history fallback
+    // Save history (we still handle history caching locally)
     await saveToLocalHistory(result, profileData.profileUrl);
 
-    // Increment usage count in Firestore on success
-    const currentCount = await getFirestoreUsageCount(session.uid, session.idToken);
-    const updatedCount = await incrementFirestoreUsageCount(session.uid, session.idToken, currentCount);
+    // Get the updated limit count since the backend auto-increments
+    const newCount = await getBackendUsageCount(session.idToken);
 
-    activeAbortController = null;
-    sendResponse({ success: true, data: result, user: session, analysisCount: updatedCount });
+    sendResponse({ success: true, data: result, user: session, analysisCount: newCount });
   } catch (error) {
-    activeAbortController = null;
-    if (error.name === 'AbortError') {
-      console.log('Analysis gracefully aborted.');
-      sendResponse({ error: 'ANALYSIS_ABORTED', message: 'Analysis cancelled by user.' });
+    console.error('Analysis error:', error);
+    if (error.name === 'LIMIT_REACHED') {
+      sendResponse({ 
+        error: 'LIMIT_REACHED', 
+        message: `You have used all ${CONFIG.FREE_SCAN_LIMIT} free scans. Upgrade to continue.`,
+        upgradeUrl: CONFIG.UPGRADE_URL
+      });
       return;
     }
-    console.error('Analysis error:', error);
     sendResponse({ error: 'ANALYSIS_FAILED', message: error.message });
   }
 }
@@ -230,7 +210,7 @@ async function handleGetSettings(sendResponse) {
   const session = await getValidSession();
   let analysisCount = 0;
   if (session) {
-    analysisCount = await getFirestoreUsageCount(session.uid, session.idToken);
+    analysisCount = await getBackendUsageCount(session.idToken);
   }
   sendResponse({
     ...settings,
