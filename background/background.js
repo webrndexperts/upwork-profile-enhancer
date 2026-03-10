@@ -6,7 +6,9 @@ import {
   getSession,
   deleteAccount
 } from '../firebase/firebase-auth.js';
+import { getFirestoreUsageCount, incrementFirestoreUsageCount } from '../firebase/firestore-usage.js';
 import { encryptData, decryptData } from '../lib/crypto-utils.js';
+import { CONFIG } from '../config/config.js';
 
 let activeAbortController = null;
 
@@ -65,14 +67,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleDeleteAccount(sendResponse);
     return true;
   }
-  if (message.type === 'GET_API_KEY') {
-    chrome.storage.local.get(['geminiApiKey', 'openaiApiKey', 'activeProvider'], result => {
-      const provider = result.activeProvider || 'gemini';
-      const apiKey = provider === 'openai' ? result.openaiApiKey : result.geminiApiKey;
-      sendResponse({ apiKey: apiKey || null, provider });
-    });
-    return true;
-  }
   if (message.type === 'GET_PROFILE_HISTORY') {
     handleGetProfileHistory(message.profileUrl, sendResponse);
     return true;
@@ -100,35 +94,54 @@ async function handleAnalysis(profileData, sendResponse) {
       return;
     }
 
+    // Free trial check (Firestore-backed)
+    if (!CONFIG.DEV_UNLIMITED_SCANS) {
+      const count = await getFirestoreUsageCount(session.uid, session.idToken);
+      if (count >= CONFIG.FREE_SCAN_LIMIT) {
+        sendResponse({
+          error: 'LIMIT_REACHED',
+          message: `You have used all ${CONFIG.FREE_SCAN_LIMIT} free scans. Upgrade to continue.`,
+          upgradeUrl: CONFIG.UPGRADE_URL
+        });
+        return;
+      }
+    }
+
     const settings = await getSettings();
     const provider = settings.activeProvider || 'gemini';
-    const apiKey   = provider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey;
+    const apiKey   = provider === 'openai' ? CONFIG.OPENAI_API_KEY : CONFIG.GEMINI_API_KEY;
 
     if (!apiKey) {
       sendResponse({ error: 'NO_API_KEY', message: 'Please add your API key in Settings.' });
       return;
     }
 
-    // Extract document texts (sent from sidebar via content script)
+    // Extract document texts and top skills (sent from sidebar via content script)
     const resumeText   = profileData.resumeText || null;
     const linkedinText = profileData.linkedinText || null;
+    const topSkills    = profileData.topSkills || null;
 
-    // Remove document texts from profileData to keep it clean for the DOM data
+    // Remove extra fields from profileData to keep it clean for the DOM data
     const cleanProfileData = { ...profileData };
     delete cleanProfileData.resumeText;
     delete cleanProfileData.linkedinText;
+    delete cleanProfileData.topSkills;
 
     activeAbortController = new AbortController();
     const signal = activeAbortController.signal;
 
     const ai     = createProvider(provider, settings.selectedModel);
-    const result = await ai.analyze(cleanProfileData, apiKey, resumeText, linkedinText, signal);
+    const result = await ai.analyze(cleanProfileData, apiKey, resumeText, linkedinText, signal, 0, topSkills);
 
     // Local history fallback
     await saveToLocalHistory(result, profileData.profileUrl);
 
+    // Increment usage count in Firestore on success
+    const currentCount = await getFirestoreUsageCount(session.uid, session.idToken);
+    const updatedCount = await incrementFirestoreUsageCount(session.uid, session.idToken, currentCount);
+
     activeAbortController = null;
-    sendResponse({ success: true, data: result, user: session });
+    sendResponse({ success: true, data: result, user: session, analysisCount: updatedCount });
   } catch (error) {
     activeAbortController = null;
     if (error.name === 'AbortError') {
@@ -176,46 +189,32 @@ async function handleGetHistory(sendResponse) {
 
 /**
  * Retrieves settings from Chrome local storage.
+ * API keys are provided from config, not user storage.
  *
  * @returns {Promise<object>}
  */
 async function getSettings() {
-  const session = await getValidSession();
   return new Promise(resolve => {
-    chrome.storage.local.get(['geminiApiKey', 'openaiApiKey', 'activeProvider', 'selectedModel'], async result => {
-      const settings = { ...result };
-      
-      // Decrypt API keys if they are encrypted objects
-      if (session) {
-        if (settings.geminiApiKey && typeof settings.geminiApiKey === 'object') {
-          settings.geminiApiKey = await decryptData(settings.geminiApiKey, session.uid);
-        }
-        if (settings.openaiApiKey && typeof settings.openaiApiKey === 'object') {
-          settings.openaiApiKey = await decryptData(settings.openaiApiKey, session.uid);
-        }
-      }
-      
-      resolve(settings);
+    chrome.storage.local.get(['activeProvider', 'selectedModel'], result => {
+      resolve({
+        activeProvider: result.activeProvider || 'gemini',
+        selectedModel: result.selectedModel || null
+      });
     });
   });
 }
 
 /**
- * Handles saving settings with encryption for API keys.
+ * Handles saving settings (provider and model selection only).
+ *
+ * @param {object} settings - Settings to save
+ * @param {function} sendResponse - Chrome message response callback
  */
 async function handleSaveSettings(settings, sendResponse) {
   try {
-    const session = await getValidSession();
-    const toSave = { ...settings };
-
-    if (session) {
-      if (toSave.geminiApiKey && typeof toSave.geminiApiKey === 'string') {
-        toSave.geminiApiKey = await encryptData(toSave.geminiApiKey, session.uid);
-      }
-      if (toSave.openaiApiKey && typeof toSave.openaiApiKey === 'string') {
-        toSave.openaiApiKey = await encryptData(toSave.openaiApiKey, session.uid);
-      }
-    }
+    const toSave = {};
+    if (settings.activeProvider) toSave.activeProvider = settings.activeProvider;
+    if (settings.selectedModel) toSave.selectedModel = settings.selectedModel;
 
     chrome.storage.local.set(toSave, () => sendResponse({ success: true }));
   } catch (e) {
@@ -224,12 +223,25 @@ async function handleSaveSettings(settings, sendResponse) {
 }
 
 /**
- * Handles getting settings with decryption.
+ * Handles getting settings — includes usage count for sidebar.
  */
 async function handleGetSettings(sendResponse) {
   const settings = await getSettings();
-  sendResponse(settings);
+  const session = await getValidSession();
+  let analysisCount = 0;
+  if (session) {
+    analysisCount = await getFirestoreUsageCount(session.uid, session.idToken);
+  }
+  sendResponse({
+    ...settings,
+    analysisCount,
+    freeScanLimit: CONFIG.FREE_SCAN_LIMIT,
+    upgradeUrl: CONFIG.UPGRADE_URL,
+    devUnlimited: !!CONFIG.DEV_UNLIMITED_SCANS
+  });
 }
+
+
 
 /**
  * Saves analysis result to local history.

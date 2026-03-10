@@ -31,6 +31,11 @@ let resumeText     = null;
 let linkedinText   = null;
 let isAnalyzing    = false;
 let lastResultData = null;
+let topSkills      = '';
+let analysisCount  = 0;
+let freeScanLimit  = 5;
+let upgradeUrl     = 'https://rndexperts.com/upgrade';
+let devUnlimited   = false;
 
 const $ = id => document.getElementById(id);
 
@@ -51,11 +56,21 @@ function show(name) {
   Object.values(views).forEach(v => { if (v) v.style.display = 'none'; });
   if (views[name]) views[name].style.display = 'block';
   
-  // If showing the ready view, ensure the last scan card is visible only if we have data
+  // If showing the ready view, reset uploads and refresh last scan card
   if (name === 'ready') {
+    resetUploadZones();
+
     const card = $('lastScanCard');
     if (card) {
       if (lastResultData) {
+        // Re-render the card to ensure score/category are populated
+        restoreState().then(saved => {
+          if (saved && saved.lastResults) {
+            showLastScanCard(saved.lastResults, saved.savedAt);
+          } else {
+            showLastScanCard(lastResultData, Date.now());
+          }
+        });
         card.style.display = 'block';
       } else {
         card.style.display = 'none';
@@ -65,6 +80,37 @@ function show(name) {
 
   // Save current view to session storage for persistence
   saveState({ currentView: name });
+}
+
+/**
+ * Resets both upload zones to their default empty state.
+ */
+function resetUploadZones() {
+  ['resume', 'linkedin'].forEach(prefix => {
+    const dropZone    = $(`${prefix}DropZone`);
+    const zoneContent = $(`${prefix}ZoneContent`);
+    const preview     = $(`${prefix}Preview`);
+    const fileInput   = $(`${prefix}FileInput`);
+    const errorEl     = $(`${prefix}Error`);
+    if (!dropZone) return;
+
+    dropZone.classList.remove('has-file');
+    if (zoneContent) {
+      zoneContent.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Drop PDF here or <strong>browse</strong></span>
+      `;
+      zoneContent.style.display = 'flex';
+    }
+    if (preview) preview.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+    if (errorEl) errorEl.style.display = 'none';
+  });
+
+  // Clear stored text data
+  resumeText = null;
+  linkedinText = null;
+  updateSourcesIndicator();
 }
 
 // ── Boot: check auth, restore state ───────────────────────────────────────
@@ -164,7 +210,8 @@ window.addEventListener('message', ({ data, origin }) => {
   if (data?.type === 'PROFILE_DATA') {
     profileData = data.data;
     renderProfileCard(data.data);
-    checkApiKey();
+    // Upload card is always enabled since API keys are config-provided
+    $('uploadCard')?.classList.remove('disabled');
     // If we have saved results, we check if they belong to this profile
     restoreState().then(saved => {
       if (saved && saved.lastResults && saved.profileUrl === data.data.profileUrl) {
@@ -224,7 +271,7 @@ $('closeBtn').addEventListener('click', () =>
 
 $('settingsBtn').addEventListener('click', () => show('settings'));
 $('backBtn')?.addEventListener('click', () => show('ready'));
-$('goToSettingsLink')?.addEventListener('click', e => { e.preventDefault(); show('settings'); });
+
 
 // ── View Last Report ───────────────────────────────────────────────────
 $('viewLastReportBtn').addEventListener('click', () => {
@@ -233,14 +280,17 @@ $('viewLastReportBtn').addEventListener('click', () => {
     if (lastResultData.suggestions) {
       renderSuggestions(lastResultData.suggestions);
     }
-    fetchAndShowScoreDelta(lastResultData.overallScore);
   }
 });
 
 // ── Analysis (debounced) ───────────────────────────────────────────────────
 $('analyzeBtn').addEventListener('click', triggerAnalysis);
 $('retryBtn').addEventListener('click', triggerAnalysis);
-$('reanalyzeBtn').addEventListener('click', triggerAnalysis);
+$('reanalyzeBtn').addEventListener('click', () => {
+  // Force re-analysis: clear cached hash so triggerAnalysis doesn't skip
+  if (lastResultData) delete lastResultData._hash;
+  triggerAnalysis();
+});
 
 // Copy URL
 $('copyUrlBtn').addEventListener('click', () => {
@@ -256,38 +306,18 @@ $('copyUrlBtn').addEventListener('click', () => {
 $('providerSelect').addEventListener('change', function () {
   activeProvider = this.value;
   updateModelOptions(activeProvider);
-  updateProviderNote(activeProvider);
   saveProviderChoice();
-  checkApiKey();
 });
 
-// Provider tabs in settings
-document.querySelectorAll('.provider-tab').forEach(tab => {
-  tab.addEventListener('click', function () {
-    document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
-    this.classList.add('active');
-    const p = this.dataset.provider;
-    $('geminiSettings').style.display = p === 'gemini' ? 'block' : 'none';
-    $('openaiSettings').style.display = p === 'openai' ? 'block' : 'none';
-  });
-});
+// Model select change handler
+$('modelSelect')?.addEventListener('change', saveProviderChoice);
 
-// Key management handlers
-$('saveGeminiBtn').addEventListener('click', saveGeminiApiKey);
-$('saveOpenAIBtn').addEventListener('click', saveOpenAIApiKey);
-
-$('removeGeminiBtn').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { geminiApiKey: '' } }, () => {
-    showSaveMsg('Gemini key removed', 'ok');
-    loadSettings();
-  });
-});
-
-$('removeOpenAIBtn').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { openaiApiKey: '' } }, () => {
-    showSaveMsg('OpenAI key removed', 'ok');
-    loadSettings();
-  });
+// Top skills — save on blur
+$('topSkillsInput')?.addEventListener('blur', () => {
+  const sanitized = sanitizeSkills($('topSkillsInput').value);
+  $('topSkillsInput').value = sanitized;
+  topSkills = sanitized;
+  chrome.storage.local.set({ topSkills: sanitized });
 });
 
 // ── Settings & Account ─────────────────────────────────────────────────────
@@ -351,49 +381,97 @@ function loadSettings() {
     activeProvider = res.activeProvider || 'gemini';
     $('providerSelect').value = activeProvider;
     updateModelOptions(activeProvider);
-    updateProviderNote(activeProvider);
     if (res.selectedModel) $('modelSelect').value = res.selectedModel;
-    
-    // UI states for keys — if key exists, show 'Saved' state, otherwise show input
-    const hasGemini = !!res.geminiApiKey;
-    $('geminiInputState').style.display = hasGemini ? 'none' : 'flex';
-    $('geminiSavedState').style.display = hasGemini ? 'flex' : 'none';
-    if (!hasGemini) $('geminiKeyInput').value = '';
 
-    const hasOpenAI = !!res.openaiApiKey;
-    $('openaiInputState').style.display = hasOpenAI ? 'none' : 'flex';
-    $('openaiSavedState').style.display = hasOpenAI ? 'flex' : 'none';
-    if (!hasOpenAI) $('openaiKeyInput').value = '';
+    // Usage tracking
+    analysisCount = res.analysisCount || 0;
+    freeScanLimit = res.freeScanLimit || 5;
+    upgradeUrl = res.upgradeUrl || 'https://rndexperts.com/upgrade';
+    devUnlimited = !!res.devUnlimited;
+    updateUsageBar();
 
-    checkApiKey();
+    // Set footer upgrade URL
+    const upgradeBtn = $('footerUpgradeBtn');
+    if (upgradeBtn) upgradeBtn.href = upgradeUrl;
   });
+
+  // Restore saved top skills
+  chrome.storage.local.get(['topSkills'], r => {
+    if (r.topSkills) {
+      topSkills = r.topSkills;
+      $('topSkillsInput').value = topSkills;
+    }
+  });
+}
+
+/**
+ * Updates the usage bar UI with current scan count.
+ */
+function updateUsageBar() {
+  const bar = $('usageBar');
+  if (!bar) return;
+
+  // Hide for dev unlimited mode
+  if (devUnlimited) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  const remaining = Math.max(0, freeScanLimit - analysisCount);
+  const usageText = $('usageText');
+  const dotsEl = $('usageDots');
+
+  // Action buttons
+  const analyzeBtn = $('analyzeBtn');
+
+  // Text
+  if (remaining === 0) {
+    usageText.textContent = 'No free scans remaining';
+    usageText.className = 'usage-text usage-exhausted';
+    if (analyzeBtn) {
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Limit Reached`;
+      analyzeBtn.style.opacity = '0.7';
+      analyzeBtn.style.cursor = 'not-allowed';
+    }
+  } else {
+    if (remaining <= 2) {
+      usageText.textContent = `${remaining} of ${freeScanLimit} free scans remaining`;
+      usageText.className = 'usage-text usage-low';
+    } else {
+      usageText.textContent = `${remaining} of ${freeScanLimit} free scans remaining`;
+      usageText.className = 'usage-text';
+    }
+    
+    // Ensure button is enabled if not analyzing
+    if (analyzeBtn && !isAnalyzing) {
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg> Analyze This Profile`;
+      analyzeBtn.style.opacity = '1';
+      analyzeBtn.style.cursor = 'pointer';
+    }
+  }
+
+  // Dots
+  let dotsHtml = '';
+  const state = remaining === 0 ? 'usage-exhausted' : (remaining <= 2 ? 'usage-low' : '');
+  for (let i = 0; i < freeScanLimit; i++) {
+    const used = i < analysisCount;
+    dotsHtml += `<span class="usage-dot${used ? ` used ${state}` : ''}"></span>`;
+  }
+  dotsEl.innerHTML = dotsHtml;
 }
 
 /**
  * Saves Gemini API key independently.
+ * @deprecated API keys are now config-provided.
  */
-function saveGeminiApiKey() {
-  const val = $('geminiKeyInput').value.trim();
-  if (!val) return showSaveMsg('Enter a valid key', 'err');
-  
-  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { geminiApiKey: val } }, () => {
-    showSaveMsg('Gemini key saved!', 'ok');
-    loadSettings();
-  });
-}
 
 /**
  * Saves OpenAI API key independently.
+ * @deprecated API keys are now config-provided.
  */
-function saveOpenAIApiKey() {
-  const val = $('openaiKeyInput').value.trim();
-  if (!val) return showSaveMsg('Enter a valid key', 'err');
-  
-  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { openaiApiKey: val } }, () => {
-    showSaveMsg('OpenAI key saved!', 'ok');
-    loadSettings();
-  });
-}
 
 /**
  * Saves just the provider and model selection.
@@ -417,44 +495,8 @@ function updateModelOptions(provider) {
 }
 
 /**
- * Updates the provider note text below model selector.
- *
- * @param {string} provider - 'gemini' or 'openai'
+ * @deprecated API keys are now config-provided. No need to check.
  */
-function updateProviderNote(provider) {
-  const note = $('providerNote');
-  note.textContent = provider === 'openai'
-    ? 'Requires OpenAI credits - platform.openai.com'
-    : 'Free via Google AI Studio';
-  note.style.color = provider === 'openai' ? '#f0b942' : '';
-}
-
-/**
- * Checks if an API key is set for the active provider and updates UI accordingly.
- */
-function checkApiKey() {
-  chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, res => {
-    const warn     = $('apiKeyWarning');
-    const btn      = $('analyzeBtn');
-    const uploadCard = $('uploadCard');
-    const provider = res?.activeProvider || 'gemini';
-    const key      = provider === 'openai' ? res?.openaiApiKey : res?.geminiApiKey;
-    if (!key) {
-      warn.style.display = 'flex';
-      const txt = $('apiKeyWarningText');
-      if (txt) {
-        txt.innerHTML = `Add your ${provider === 'openai' ? 'OpenAI' : 'Gemini'} key in <a href="#" id="goToSettingsLink">Settings</a>.`;
-        document.getElementById('goToSettingsLink')?.addEventListener('click', e => { e.preventDefault(); show('settings'); });
-      }
-      btn.disabled = true;
-      if (uploadCard) uploadCard.classList.add('disabled');
-    } else {
-      warn.style.display = 'none';
-      btn.disabled = false;
-      if (uploadCard) uploadCard.classList.remove('disabled');
-    }
-  });
-}
 
 // ── Profile card ───────────────────────────────────────────────────────────
 /**
@@ -495,6 +537,7 @@ function initUploadHandlers() {
 
   setupTooltip('resumeInfoBtn', 'resumeTooltip');
   setupTooltip('linkedinInfoBtn', 'linkedinTooltip');
+  setupTooltip('usageTooltipTrigger', 'usageTooltip');
 }
 
 /**
@@ -554,6 +597,11 @@ function setupUploadZone(prefix, onSuccess, onRemove) {
   removeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     dropZone.classList.remove('has-file');
+    // Reset zone content back to default (clears any stuck spinner)
+    zoneContent.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Drop PDF here or <strong>browse</strong></span>
+    `;
     zoneContent.style.display = 'flex';
     preview.style.display = 'none';
     errorEl.style.display = 'none';
@@ -733,8 +781,7 @@ function triggerAnalysis() {
   // ... rest as before
   const providerText = $('loadingProviderText');
   if (providerText) {
-    const name = activeProvider === 'openai' ? 'OpenAI' : 'Gemini AI';
-    providerText.textContent = `Sending to ${name}`;
+    providerText.textContent = 'Processing with AI';
   }
 
   startLoadingSteps();
@@ -752,8 +799,41 @@ function triggerAnalysis() {
   window.parent.postMessage({
     type: 'ANALYZE_REQUEST',
     resumeText: resumeText || null,
-    linkedinText: linkedinText || null
+    linkedinText: linkedinText || null,
+    topSkills: sanitizeSkills($('topSkillsInput')?.value || '') || null
   }, '*');
+}
+
+/**
+ * Sanitizes and validates the top skills input.
+ * Strips HTML, limits to 5 skills, 30 chars each, alphanumeric + common chars only.
+ *
+ * @param {string} raw - Raw input value
+ * @returns {string} Cleaned comma-separated skills string
+ */
+function sanitizeSkills(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+
+  // Strip HTML tags
+  let clean = raw.replace(/<[^>]*>/g, '');
+
+  // Split by comma, trim, filter empties
+  let skills = clean
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  // Limit to 5 skills
+  skills = skills.slice(0, 5);
+
+  // Per-skill: max 30 chars, only alphanumeric + spaces + dots + hyphens + plus + hash + slash
+  skills = skills.map(s => {
+    s = s.substring(0, 30);
+    s = s.replace(/[^a-zA-Z0-9\s.\-+#/]/g, '');
+    return s.trim();
+  }).filter(s => s.length > 0);
+
+  return skills.join(', ');
 }
 
 /**
@@ -793,8 +873,24 @@ function handleResult(response) {
     return;
   }
 
+  // Update usage count if provided
+  if (response.analysisCount !== undefined) {
+    analysisCount = response.analysisCount;
+    updateUsageBar();
+  }
+
   if (!response || response.error) {
-    $('errorMsg').textContent = response?.message || 'Analysis failed. Please try again.';
+    if (response.error === 'LIMIT_REACHED') {
+      $('errorMsg').innerHTML = `
+        <div style="margin-bottom: 12px"><strong>Scan Limit Reached.</strong></div>
+        You have used all ${freeScanLimit} free scans. Upgrade your account to continue optimizing profiles.
+        <div style="margin-top: 16px;">
+          <a href="${upgradeUrl}" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; display:inline-block; width:auto; padding:8px 16px;">Upgrade Now</a>
+        </div>
+      `;
+    } else {
+      $('errorMsg').textContent = response?.message || 'Analysis failed. Please try again.';
+    }
     show('error');
     return;
   }
@@ -813,8 +909,6 @@ function handleResult(response) {
       lastResults: response.data,
       profileUrl: profileData?.profileUrl
     });
-    // Fetch and show score delta from previous analyses
-    fetchAndShowScoreDelta(response.data.overallScore);
   } else {
     $('errorMsg').textContent = 'Unexpected response. Please try again.';
     show('error');

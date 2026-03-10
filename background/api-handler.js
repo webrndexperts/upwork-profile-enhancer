@@ -55,10 +55,11 @@ function sanitizeInput(text) {
  * @param {string|null} linkedinText - Optional LinkedIn profile text
  * @returns {string} The formatted prompt
  */
-function buildAnalysisPrompt(profileData, resumeText, linkedinText) {
+function buildAnalysisPrompt(profileData, resumeText, linkedinText, topSkills) {
   const hasResume = !!resumeText;
   const hasLinkedin = !!linkedinText;
   const hasExtraDocs = hasResume || hasLinkedin;
+  const hasSkills = !!topSkills;
 
   let prompt = `You are an expert Upwork profile optimizer. Analyze the ACTUAL profile data below and provide scoring and recommendations.
 
@@ -85,6 +86,19 @@ ${sanitizeInput(resumeText)}
     prompt += `
 === LINKEDIN PROFILE DATA (uploaded by user) ===
 ${sanitizeInput(linkedinText)}
+`;
+  }
+
+  if (hasSkills) {
+    prompt += `
+=== USER-DECLARED TOP SKILLS ===
+${sanitizeInput(topSkills)}
+
+IMPORTANT: The user has declared these as their strongest skills. On Upwork, skill strength 
+is often judged by completed projects, but that doesn't capture the full picture. 
+Treat these skills as genuine strengths when evaluating the profile and generating 
+recommendations. Factor them into the Skills section scoring and suggest how to 
+better showcase them in the profile.
 `;
   }
 
@@ -189,9 +203,10 @@ class GeminiProvider {
    * @param {string|null} resumeText - Optional resume text
    * @param {string|null} linkedinText - Optional LinkedIn text
    * @param {number} retries - Current retry count
+   * @param {string|null} topSkills - Optional user-declared top skills
    * @returns {Promise<object>} Parsed analysis results
    */
-  async analyze(profileData, apiKey, resumeText = null, linkedinText = null, signal = null, retries = 0) {
+  async analyze(profileData, apiKey, resumeText = null, linkedinText = null, signal = null, retries = 0, topSkills = null) {
     if (isRateLimited()) {
       throw new Error('Rate limit reached. Please wait before making more requests (max 10 per hour).');
     }
@@ -203,7 +218,7 @@ class GeminiProvider {
       headers: { 'Content-Type': 'application/json' },
       signal,
       body: JSON.stringify({
-        contents: [{ parts: [{ text: buildAnalysisPrompt(profileData, resumeText, linkedinText) }] }],
+        contents: [{ parts: [{ text: buildAnalysisPrompt(profileData, resumeText, linkedinText, topSkills) }] }],
         generationConfig: { temperature: 0, maxOutputTokens: 8192 }
       })
     });
@@ -245,7 +260,7 @@ class OpenAIProvider {
    * @param {number} retries - Current retry count
    * @returns {Promise<object>} Parsed analysis results
    */
-  async analyze(profileData, apiKey, resumeText = null, linkedinText = null, signal = null, retries = 0) {
+  async analyze(profileData, apiKey, resumeText = null, linkedinText = null, signal = null, retries = 0, topSkills = null) {
     if (isRateLimited()) {
       throw new Error('Rate limit reached. Please wait before making more requests (max 10 per hour).');
     }
@@ -270,7 +285,7 @@ class OpenAIProvider {
           },
           {
             role: 'user',
-            content: buildAnalysisPrompt(profileData, resumeText, linkedinText)
+            content: buildAnalysisPrompt(profileData, resumeText, linkedinText, topSkills)
           }
         ]
       })

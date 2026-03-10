@@ -51,6 +51,20 @@
       </button>
     </div>
 
+    <!-- Usage Bar (free trial indicator) -->
+    <div class="usage-bar" id="usageBar" style="display:none">
+      <div class="usage-info">
+        <span class="usage-text" id="usageText">5 of 5 free scans remaining</span>
+        <span class="usage-tooltip-wrapper">
+          <span class="usage-tooltip-trigger info-btn" id="usageTooltipTrigger">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </span>
+          <div class="info-tooltip" id="usageTooltip">Free plan: 5 scans included. Upgrade for unlimited analyses, priority support, and advanced recommendations.</div>
+        </span>
+      </div>
+      <div class="usage-dots" id="usageDots"></div>
+    </div>
+
     <!-- Body -->
     <div class="sidebar-body" id="sidebarBody">
 
@@ -92,11 +106,17 @@
               <svg class="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
           </div>
-          <div class="model-note" id="providerNote">Free via Google AI Studio</div>
+        </div>
+
+        <!-- Top Skills Card -->
+        <div class="skills-card">
+          <div class="skills-label">YOUR TOP SKILLS <span class="upload-optional">(up to 5)</span></div>
+          <input type="text" id="topSkillsInput" class="skills-input" placeholder="e.g. React, Node.js, Python, AWS, Docker" maxlength="200" autocomplete="off" spellcheck="false">
+          <div class="skills-hint" id="skillsHint">Comma-separated · These help the AI understand your true strengths</div>
         </div>
 
         <!-- Upload Documents Card -->
-        <div class="upload-card disabled" id="uploadCard">
+        <div class="upload-card" id="uploadCard">
           <div class="upload-card-label">UPLOAD DOCUMENTS <span class="upload-optional">(optional)</span></div>
 
           <!-- Resume Upload -->
@@ -186,14 +206,6 @@
           Click <strong>"more"</strong> on the profile page to expand the full description before analyzing.
         </div>
 
-        <div class="api-key-warning" id="apiKeyWarning" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <div>
-            <strong>API Key Required</strong>
-            <p id="apiKeyWarningText">Add your API key in <a href="#" id="goToSettingsLink">Settings</a> to start.</p>
-          </div>
-        </div>
-
         <button class="analyze-btn" id="analyzeBtn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
           Analyze This Profile
@@ -210,64 +222,11 @@
           <span class="settings-title">Settings</span>
         </div>
 
-        <!-- Provider tabs -->
-        <div class="provider-tabs">
-          <button class="provider-tab active" data-provider="gemini" id="tabGemini">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-            Gemini
-          </button>
-          <button class="provider-tab" data-provider="openai" id="tabOpenAI">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
-            OpenAI
-          </button>
-        </div>
-
-        <!-- Gemini settings -->
-        <div id="geminiSettings">
-          <div class="form-group">
-            <div class="form-label">
-              Gemini API Key
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get free →</a>
-            </div>
-            <div class="input-wrap" id="geminiInputState">
-              <input type="password" id="geminiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false">
-              <button class="key-save-btn" id="saveGeminiBtn">Save</button>
-            </div>
-            <div class="saved-key-wrap" id="geminiSavedState" style="display:none">
-              <span class="saved-key-dots">••••••••••••••••••••••••••••••••</span>
-              <button class="remove-key-btn" id="removeGeminiBtn">Delete</button>
-            </div>
-            <div class="form-hint">Free at aistudio.google.com · Stored locally only</div>
-          </div>
-        </div>
-
-        <!-- OpenAI settings -->
-        <div id="openaiSettings" style="display:none">
-          <div class="form-group">
-            <div class="form-label">
-              OpenAI API Key
-              <a href="https://platform.openai.com/api-keys" target="_blank" class="get-key-link">Get key →</a>
-            </div>
-            <div class="input-wrap" id="openaiInputState">
-              <input type="password" id="openaiKeyInput" placeholder="Enter new API key..." class="text-input" autocomplete="off" spellcheck="false">
-              <button class="key-save-btn" id="saveOpenAIBtn">Save</button>
-            </div>
-            <div class="saved-key-wrap" id="openaiSavedState" style="display:none">
-              <span class="saved-key-dots">••••••••••••••••••••••••••••••••</span>
-              <button class="remove-key-btn" id="removeOpenAIBtn">Delete</button>
-            </div>
-            <div class="form-hint">Requires credits at platform.openai.com · Stored locally only</div>
-          </div>
-        </div>
-
-        <div class="save-msg" id="saveMsg"></div>
-
-        <div class="form-divider"></div>
-
         <div class="form-group">
           <div class="form-label">Data & History</div>
           <button class="danger-btn" id="clearHistoryBtn">Clear Analysis History</button>
           <button class="danger-btn" id="clearAllDataBtn" style="margin-top:6px">Clear All Saved Data</button>
+          <div class="save-msg" id="saveMsg"></div>
         </div>
 
         <div class="form-divider"></div>
@@ -291,7 +250,7 @@
           <div class="loading-title">Analyzing Profile…</div>
           <div class="step-list" id="loadingSteps">
             <div class="step-item" data-step="0"><span class="step-dot"></span>Extracting profile data</div>
-            <div class="step-item" data-step="1"><span class="step-dot"></span><span id="loadingProviderText">Sending to AI</span></div>
+            <div class="step-item" data-step="1"><span class="step-dot"></span><span id="loadingProviderText">Processing with AI</span></div>
             <div class="step-item" data-step="2"><span class="step-dot"></span>Scoring 8 sections</div>
             <div class="step-item" data-step="3"><span class="step-dot"></span>Building recommendations</div>
           </div>
@@ -342,7 +301,6 @@
           <div class="score-info">
             <div class="score-cat" id="scoreCat">—</div>
             <div class="score-desc-text" id="scoreDescText"></div>
-            <div class="score-pts-pill" id="scorePts"></div>
             <button class="reanalyze-btn" id="reanalyzeBtn">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Re-analyze
@@ -350,11 +308,6 @@
           </div>
         </div>
 
-        <!-- Score Delta / History -->
-        <div class="score-delta-bar" id="scoreDeltaBar" style="display:none">
-          <span class="score-delta-icon" id="scoreDeltaIcon"></span>
-          <span class="score-delta-text" id="scoreDeltaText"></span>
-        </div>
 
         <div class="result-block" id="prioritiesBlock" style="display:none">
           <div class="block-label">
@@ -416,7 +369,10 @@
     <!-- Footer -->
     <div class="sidebar-footer">
       <span>RND Upwork Profile Optimizer</span>
-      <span class="footer-pill">FREE</span>
+      <a href="#" class="footer-upgrade-btn" id="footerUpgradeBtn" target="_blank" rel="noopener">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+        Upgrade
+      </a>
     </div>
 
   </div>

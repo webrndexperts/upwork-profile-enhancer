@@ -161,6 +161,9 @@
       sidebarFrame.classList.add('rnd-sidebar-visible');
     });
 
+    // Hide floating button while sidebar is open
+    if (floatingBtn) floatingBtn.style.display = 'none';
+
     document.body.classList.add('rnd-sidebar-open');
   }
 
@@ -183,6 +186,9 @@
       }, 350);
     }
     document.body.classList.remove('rnd-sidebar-open');
+
+    // Show floating button again
+    if (floatingBtn) floatingBtn.style.display = '';
   }
 
   /**
@@ -377,12 +383,15 @@
         if (event.data?.type === 'ANALYZE_REQUEST') {
           const profileData = extractProfileData();
 
-          // Pass along any document texts from the sidebar
+          // Pass along any document texts and skills from the sidebar
           if (event.data.resumeText) {
             profileData.resumeText = event.data.resumeText;
           }
           if (event.data.linkedinText) {
             profileData.linkedinText = event.data.linkedinText;
+          }
+          if (event.data.topSkills) {
+            profileData.topSkills = event.data.topSkills;
           }
 
           chrome.runtime.sendMessage({
