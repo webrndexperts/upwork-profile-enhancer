@@ -22,9 +22,18 @@ export const CONFIG = {
   // Google OAuth Client ID
   GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com",
   
+  // AI Provider API Keys (service-provided, not user-managed)
+  GEMINI_API_KEY: "YOUR_GEMINI_API_KEY_HERE",
+  OPENAI_API_KEY: "YOUR_OPENAI_API_KEY_HERE",
+
   // API endpoints
   APIS: {
     GEMINI: "https://generativelanguage.googleapis.com/v1beta",
     OPENAI: "https://api.openai.com/v1"
-  }
+  },
+
+  // Trial / Subscription
+  FREE_SCAN_LIMIT: 5,
+  UPGRADE_URL: "https://rndexperts.com/upgrade",
+  DEV_UNLIMITED_SCANS: false  // Set to true to bypass free scan limit in development
 };

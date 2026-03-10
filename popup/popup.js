@@ -29,11 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Load key
-  chrome.runtime.sendMessage({ type: 'GET_API_KEY' }, res => {
-    if (res?.apiKey) $('apiInput').value = res.apiKey;
-  });
-
   // Go button
   $('goBtn').addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -41,35 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
       window.close();
     });
   });
-
-  // Nav
-  $('gearBtn').addEventListener('click', () => { $('mainView').style.display='none'; $('settingsView').style.display='block'; });
-  $('backBtn').addEventListener('click', () => { $('settingsView').style.display='none'; $('mainView').style.display='block'; });
-
-  // Toggle key
-  let shown = false;
-  $('toggleBtn').addEventListener('click', () => { shown=!shown; $('apiInput').type = shown?'text':'password'; });
-
-  // Save
-  $('saveBtn').addEventListener('click', () => {
-    const k = $('apiInput').value.trim();
-    if (!k) { msg('Enter a key first', 'err'); return; }
-    chrome.runtime.sendMessage({ type: 'SAVE_API_KEY', apiKey: k }, () => msg('✓ Saved!', 'ok'));
-  });
-
-  // Clear
-  $('clearBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'CLEAR_HISTORY' }, () => {
-      $('clearBtn').textContent = '✓ Cleared';
-      setTimeout(() => $('clearBtn').textContent = 'Clear Analysis History', 2000);
-    });
-  });
-
-  function msg(text, type) {
-    const el = $('saveMsg');
-    el.textContent = text; el.className = `s-msg ${type}`;
-    setTimeout(() => { el.textContent=''; el.className='s-msg'; }, 3000);
-  }
 });
 
 // CSP-safe replacement for inline onerror handlers

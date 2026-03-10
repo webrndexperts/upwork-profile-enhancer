@@ -9,6 +9,7 @@
   --bg: #111418;
   --bg2: #191d24;
   --bg3: #1f242d;
+  --bg-hover: #252b35;
   --card: #1a1f28;
   --card2: #222830;
 
@@ -16,17 +17,21 @@
   --border2: rgba(255,255,255,0.12);
 
   --text: #f0f2f5;
-  --text2: #a0a8b8;
-  --text3: #5a6478;
+  --text2: #c8cdd6;
+  --text3: #9ca5b6;
+  --text-muted: #9ca5b6;
 
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
   --elite: #a78bfa;
+  --acc: #31b3e5;
 
   --radius: 12px;
   --radius-sm: 8px;
   --radius-xs: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
 html, body { height: 100%; overflow: hidden; }
@@ -154,15 +159,93 @@ body {
   flex-shrink: 0;
 }
 
-.footer-pill {
-  background: var(--bg3);
-  color: var(--brand);
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  padding: 2px 7px;
+.footer-upgrade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, var(--brand), #0284c7);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
   border-radius: 20px;
-  border: 1px solid rgba(49,179,229,0.2);
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.15s;
+}
+.footer-upgrade-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.03);
+}
+
+.usage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 50; /* Ensure tooltip overlaps body */
+}
+.usage-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.usage-text {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.usage-text.usage-low {
+  color: var(--warning);
+}
+.usage-text.usage-exhausted {
+  color: var(--danger, #ef4444);
+}
+.usage-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+.usage-tooltip-trigger {
+  color: var(--text3);
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+}
+/* Override tooltip for usage bar so it doesn't get clipped */
+.usage-tooltip-wrapper .info-tooltip {
+  width: 260px;
+  left: 0;
+  top: 24px;
+  z-index: 100;
+}
+.usage-dots {
+  display: flex;
+  gap: 4px;
+}
+.usage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  transition: background 0.2s;
+}
+.usage-dot.used {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.usage-dot.used.usage-low {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+.usage-dot.used.usage-exhausted {
+  background: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
 }
 
 /* ==============================
@@ -317,7 +400,7 @@ body {
   border-radius: var(--radius-sm);
   padding: 10px 13px;
   font-size: 12px;
-  color: #c9922a;
+  color: #e0b445;
   line-height: 1.55;
   margin-bottom: 10px;
 }
@@ -757,7 +840,7 @@ body {
 
 .score-desc-text {
   font-size: 11.5px;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.82);
   line-height: 1.5;
   margin-bottom: 8px;
 }
@@ -1105,6 +1188,55 @@ body {
 .upload-card.disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+/* Skills input card */
+.skills-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.skills-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.skills-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.skills-input:focus {
+  border-color: var(--brand);
+  border-style: solid;
+}
+.skills-input::placeholder {
+  color: var(--text3);
+  font-size: 11.5px;
+}
+
+.skills-hint {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.skills-hint.skills-error {
+  color: var(--warning);
 }
 
 .upload-card-label {
