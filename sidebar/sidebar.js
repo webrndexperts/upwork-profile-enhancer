@@ -1,4 +1,4 @@
-// sidebar.js — RND Upwork Profile Optimizer
+// sidebar.js — Upwork Profile Optimizer - Upliftio
 // Features: Auth, Uploads, Suggestions, State Persistence, Score History
 
 const ICONS = {
@@ -34,10 +34,35 @@ let lastResultData = null;
 let topSkills      = '';
 let analysisCount  = 0;
 let freeScanLimit  = 5;
-let upgradeUrl     = 'https://rndexperts.com/upgrade';
+let fullScanLimit  = 3;
+let upgradeUrl     = 'https://rndexperts.com/upliftio';
+let contactUsUrl  = 'https://rndexperts.com/contact';
 let devUnlimited   = false;
 
 const $ = id => document.getElementById(id);
+
+/**
+ * Safely sends a message to the background script with error handling for extension context invalidation.
+ * @param {object} message - The message to send
+ * @param {function} callback - Optional callback function
+ * @returns {Promise|undefined} - Returns Promise if no callback provided
+ */
+function safeSendMessage(message, callback) {
+  try {
+    if (callback) {
+      chrome.runtime.sendMessage(message, callback);
+    } else {
+      return chrome.runtime.sendMessage(message);
+    }
+  } catch (error) {
+    if (error.message.includes('Extension context invalidated')) {
+      console.warn('Extension context invalidated. Please refresh the page to continue.');
+    } else {
+      console.error('Error sending message to background script:', error);
+    }
+    if (callback) callback(null);
+  }
+}
 
 const views = {
   ready:    $('readyView'),
@@ -59,6 +84,7 @@ function show(name) {
   // If showing the ready view, reset uploads and refresh last scan card
   if (name === 'ready') {
     resetUploadZones();
+    loadSettings(false)
 
     const card = $('lastScanCard');
     if (card) {
@@ -76,6 +102,13 @@ function show(name) {
         card.style.display = 'none';
       }
     }
+    
+    // Hide upload card if in partial mode or if PDF uploads should be hidden
+    // const uploadCard = $('uploadCard');
+    // if (uploadCard) {
+      // const shouldHide = shouldShowPartialResults() || shouldHidePdfUploads();
+      // uploadCard.style.display = shouldHide ? 'none' : 'block';
+    // }
   }
 
   // Save current view to session storage for persistence
@@ -241,16 +274,25 @@ window.addEventListener('unload', () => {
  * @param {object} user - The authenticated user object
  */
 function renderUserBar(user) {
-  $('userBar').style.display = 'flex';
-  $('userName').textContent  = user.displayName || 'User';
-  $('userEmail').textContent = user.email || '';
+  // Show logout button in header
+  $('signOutBtn').style.display = 'block';
+  
+  // Update profile details in settings
+  const settingsUserName = $('settingsUserName');
+  const settingsUserEmail = $('settingsUserEmail');
+  const settingsUserAvatarImg = $('settingsUserAvatarImg');
+  const settingsUserAvatarInitial = $('settingsUserAvatarInitial');
+  
+  if (settingsUserName) settingsUserName.textContent = user.displayName || 'User';
+  if (settingsUserEmail) settingsUserEmail.textContent = user.email || '';
 
-  if (user.photoURL) {
-    $('userAvatarImg').src = user.photoURL;
-    $('userAvatarImg').style.display = 'block';
-    $('userAvatarInitial').style.display = 'none';
-  } else {
-    $('userAvatarInitial').textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+  if (user.photoURL && settingsUserAvatarImg) {
+    settingsUserAvatarImg.src = user.photoURL;
+    settingsUserAvatarImg.style.display = 'block';
+    if (settingsUserAvatarInitial) settingsUserAvatarInitial.style.display = 'none';
+  } else if (settingsUserAvatarInitial) {
+    settingsUserAvatarInitial.textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+    if (settingsUserAvatarImg) settingsUserAvatarImg.style.display = 'none';
   }
 }
 
@@ -258,7 +300,7 @@ function renderUserBar(user) {
 $('signOutBtn').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'SIGN_OUT' });
   currentUser = null;
-  $('userBar').style.display = 'none';
+  $('signOutBtn').style.display = 'none';
   clearState();
   openAuthScreen();
 });
@@ -375,33 +417,89 @@ $('deleteAccountBtn').addEventListener('click', () => {
 /**
  * Loads saved settings from Chrome storage and updates UI controls.
  */
-function loadSettings() {
-  chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, res => {
-    if (!res) return;
-    activeProvider = res.activeProvider || 'gemini';
-    $('providerSelect').value = activeProvider;
-    updateModelOptions(activeProvider);
-    if (res.selectedModel) $('modelSelect').value = res.selectedModel;
-
-    // Usage tracking
-    analysisCount = res.analysisCount || 0;
-    freeScanLimit = res.freeScanLimit || 5;
-    upgradeUrl = res.upgradeUrl || 'https://rndexperts.com/upgrade';
-    devUnlimited = !!res.devUnlimited;
-    updateUsageBar();
-
-    // Set footer upgrade URL
-    const upgradeBtn = $('footerUpgradeBtn');
-    if (upgradeBtn) upgradeBtn.href = upgradeUrl;
-  });
-
-  // Restore saved top skills
-  chrome.storage.local.get(['topSkills'], r => {
-    if (r.topSkills) {
-      topSkills = r.topSkills;
-      $('topSkillsInput').value = topSkills;
+function loadSettings(allowLoader = true) {
+  const upliftioMainLoader = $('upliftioMainLoader');
+  try {
+    // Show loader before making API call
+    if (allowLoader && upliftioMainLoader) {
+      upliftioMainLoader.style.display = 'flex';
     }
-  });
+    safeSendMessage({ type: 'GET_SETTINGS' }, res => {
+      // Hide loader after getting settings
+      if (allowLoader && upliftioMainLoader) {
+        upliftioMainLoader.style.display = 'none';
+      }
+
+      if (!res) return;
+      activeProvider = res.activeProvider || 'gemini';
+      $('providerSelect').value = activeProvider;
+      updateModelOptions(activeProvider);
+      if (res.selectedModel) $('modelSelect').value = res.selectedModel;
+
+      // Usage tracking
+      // console.log('Settings response from backend:', res);
+      analysisCount = res.analysisCount || 0;
+      freeScanLimit = res.freeScanLimit || 5;
+      fullScanLimit = res.fullScanLimit || 3;
+      upgradeUrl = res.upgradeUrl || '#';
+      devUnlimited = !!res.devUnlimited;
+      updateUsageBar();
+      
+      // Update upload card visibility after settings are loaded
+      const uploadCard = $('uploadCard');
+      if (uploadCard) {
+        const checkPartialResult = shouldShowPartialResults(),
+        checkPdfUploads = shouldHidePdfUploads(),
+        shouldHide = checkPartialResult || checkPdfUploads,
+        uploadCardLimit = $('uploadCardLimit');
+
+        uploadCard.style.display = shouldHide ? 'none' : 'block';
+
+        if (uploadCardLimit && !checkPartialResult) {
+          if(checkPdfUploads) {
+            uploadCardLimit.style.display = 'block';
+            uploadCardLimit.innerHTML = `
+              <div class="partial-banner-content">
+                <div class="partial-banner-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <div class="partial-banner-text">
+                  <div class="partial-banner-title">Limited Results</div>
+                  <div class="partial-banner-desc">For uploading PDFs, please contact us.</div>
+                </div>
+                <a href="${contactUsUrl}" target="_blank" rel="noopener" class="partial-banner-btn">
+                  Contact Us
+                </a>
+              </div>
+            `;
+          } else {
+            uploadCardLimit.style.display = 'none';
+          }
+        }
+      }
+
+      // Set footer upgrade URL
+      const upgradeBtn = $('footerUpgradeBtn');
+      if (upgradeBtn) upgradeBtn.href = upgradeUrl;
+    });
+
+    // Restore saved top skills
+    chrome.storage.local.get(['topSkills'], r => {
+      if (r.topSkills) {
+        topSkills = r.topSkills;
+        $('topSkillsInput').value = topSkills;
+      }
+    });
+  } catch (error) {
+    // Hide loader on error
+    if (allowLoader && upliftioMainLoader) {
+      upliftioMainLoader.style.display = 'none';
+    }
+    console.error('Error loading settings:', error);
+  }
 }
 
 /**
@@ -477,7 +575,7 @@ function updateUsageBar() {
  * Saves just the provider and model selection.
  */
 function saveProviderChoice() {
-  chrome.runtime.sendMessage({ type: 'SAVE_SETTINGS', settings: { activeProvider, selectedModel: $('modelSelect').value } });
+  safeSendMessage({ type: 'SAVE_SETTINGS', settings: { activeProvider, selectedModel: $('modelSelect').value } });
 }
 
 /**
@@ -881,11 +979,17 @@ function handleResult(response) {
 
   if (!response || response.error) {
     if (response.error === 'LIMIT_REACHED') {
+      // $('errorMsg').innerHTML = `
+      //   <div style="margin-bottom: 12px"><strong>Scan Limit Reached.</strong></div>
+      //   You have used all ${freeScanLimit} free scans. Upgrade your account to continue optimizing profiles.
+      // `;
       $('errorMsg').innerHTML = `
-        <div style="margin-bottom: 12px"><strong>Scan Limit Reached.</strong></div>
-        You have used all ${freeScanLimit} free scans. Upgrade your account to continue optimizing profiles.
-        <div style="margin-top: 16px;">
-          <a href="${upgradeUrl}" target="_blank" rel="noopener" class="primary-btn" style="text-decoration:none; display:inline-block; width:auto; padding:8px 16px;">Upgrade Now</a>
+        <div class="card-errors">
+          <div style="margin-bottom: 12px"><strong>Scan Limit Reached.</strong></div>
+          You have used all ${freeScanLimit} free scans. Please contact us to continue optimizing profiles.
+          <a href="${contactUsUrl}" target="_blank" rel="noopener" class="partial-banner-btn">
+            Contact Us
+          </a>
         </div>
       `;
     } else {
@@ -916,6 +1020,75 @@ function handleResult(response) {
 }
 
 /**
+ * Shows the partial results lock banner.
+ */
+function showPartialResultsBanner() {
+  // Remove existing banner if present
+  hidePartialResultsBanner();
+  
+  const banner = document.createElement('div');
+  banner.id = 'partialResultsBanner';
+  banner.className = 'partial-results-banner';
+  banner.innerHTML = `
+    <div class="partial-banner-content">
+      <div class="partial-banner-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div class="partial-banner-text">
+        <div class="partial-banner-title">Limited Results</div>
+        <div class="partial-banner-desc">For full access to all analysis sections, AI suggestions, and PDF uploads, please contact us.</div>
+      </div>
+      <a href="${contactUsUrl}" target="_blank" rel="noopener" class="partial-banner-btn">
+        Contact Us
+      </a>
+    </div>
+  `;
+  
+  // Insert after the score card
+  const scoreCard = document.querySelector('.score-card');
+  if (scoreCard && scoreCard.parentNode) {
+    scoreCard.parentNode.insertBefore(banner, scoreCard.nextSibling);
+  }
+}
+
+/**
+ * Hides the partial results lock banner if it exists.
+ */
+function hidePartialResultsBanner() {
+  const existingBanner = document.getElementById('partialResultsBanner');
+  if (existingBanner) {
+    existingBanner.remove();
+  }
+}
+
+/**
+ * Determines if partial results should be shown based on scan count.
+ * @returns {boolean} - True if partial mode should be shown
+ */
+function shouldShowPartialResults() {
+  // If dev unlimited mode is enabled, always show full results
+  if (devUnlimited) return false;
+  
+  // Show partial results only when analysisCount is strictly greater than FULL_SCAN_LIMIT
+  return analysisCount > fullScanLimit;
+}
+
+/**
+ * Determines if PDF upload options should be hidden based on scan count.
+ * @returns {boolean} - True if PDF uploads should be hidden
+ */
+function shouldHidePdfUploads() {
+  // If dev unlimited mode is enabled, always show uploads
+  if (devUnlimited) return false;
+  
+  // Hide PDF uploads when analysisCount is greater than or equal to FULL_SCAN_LIMIT
+  return analysisCount >= fullScanLimit;
+}
+
+/**
  * Renders the profile analysis results (score card, priorities, sections).
  *
  * @param {object} data - The analysis data object
@@ -924,6 +1097,7 @@ function renderResults(data, isCached = false) {
   show('results');
   const score  = parseFloat(data.overallScore) || 0;
   const cat    = data.category || scoreToCategory(score);
+  const isPartialMode = shouldShowPartialResults();
 
   const scoreCard = document.querySelector('.score-card');
   if (scoreCard) scoreCard.className = `score-card cat-${cat.toLowerCase()}`;
@@ -946,46 +1120,103 @@ function renderResults(data, isCached = false) {
     if (arc) arc.style.strokeDashoffset = circ - (score / 10) * circ;
   }, 80);
 
-  if (data.top3Priorities?.length) {
-    $('prioritiesBlock').style.display = 'block';
-    $('prioritiesList').innerHTML = data.top3Priorities.map(p => `
-      <div class="priority-item">
-        <div class="p-rank rank-${p.rank}">${p.rank}</div>
-        <div class="p-content">
-          <div class="p-section">${esc(p.section)}</div>
-          <div class="p-action">${esc(p.action)}</div>
-          ${p.potentialGain ? `<span class="p-gain">${esc(p.potentialGain)}</span>` : ''}
-        </div>
-      </div>`).join('');
-  }
-
-  if (data.sections?.length) {
-    $('sectionsList').innerHTML = data.sections.map((s, i) => {
-      const pct = s.maxPoints > 0 ? Math.round((s.earnedPoints / s.maxPoints) * 100) : Math.round(s.score * 10);
-      const cls = scoreClass(s.score);
-      return `
-        <div class="section-card" id="sc${i}">
-          <div class="section-header">
-            <span class="sec-icon">${ICONS[s.id] || '[--]'}</span>
-            <div class="sec-name-wrap">
-              <div class="sec-name">${esc(s.name)}</div>
-              <div class="sec-pts">${(s.earnedPoints||0).toFixed(1)} / ${s.maxPoints} pts</div>
+  // Handle partial mode vs full mode
+  if (isPartialMode) {
+    // Hide Top 3 Priorities
+    $('prioritiesBlock').style.display = 'none';
+    
+    // Filter sections to only show Title and Profile Photo
+    if (data.sections?.length) {
+      const filteredSections = data.sections.filter(s => 
+        s.name.toLowerCase() === 'title' || s.name.toLowerCase() === 'profile photo'
+      );
+      
+      $('sectionsList').innerHTML = filteredSections.map((s, i) => {
+        const pct = s.maxPoints > 0 ? Math.round((s.earnedPoints / s.maxPoints) * 100) : Math.round(s.score * 10);
+        const cls = scoreClass(s.score);
+        return `
+          <div class="section-card" id="sc${i}">
+            <div class="section-header">
+              <div class="sec-name-wrap">
+                <div class="sec-name">${esc(s.name)}</div>
+                <div class="sec-pts">${(s.earnedPoints||0).toFixed(1)} / ${s.maxPoints} pts</div>
+              </div>
+              <div class="sec-bar-wrap"><div class="sec-bar ${cls}" data-pct="${pct}" style="width:0%"></div></div>
+              <div class="sec-score ${cls}">${(s.score||0).toFixed(1)}</div>
+              <svg class="sec-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
-            <div class="sec-bar-wrap"><div class="sec-bar ${cls}" data-pct="${pct}" style="width:0%"></div></div>
-            <div class="sec-score ${cls}">${(s.score||0).toFixed(1)}</div>
-            <svg class="sec-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <div class="section-body">
-            ${s.strengths?.length ? `<div class="list-group"><div class="list-group-title s">Strengths</div><ul>${s.strengths.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
-            ${s.improvements?.length ? `<div class="list-group"><div class="list-group-title i">Improvements</div><ul>${s.improvements.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
-            ${s.quickWin ? `<div class="quick-win-block"><div class="qw-label">Quick Win</div><div class="qw-text">${esc(s.quickWin)}</div></div>` : ''}
-          </div>
-        </div>`;
-    }).join('');
+            <div class="section-body">
+              ${s.strengths?.length ? `<div class="list-group"><div class="list-group-title s">Strengths</div><ul>${s.strengths.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+              ${s.improvements?.length ? `<div class="list-group"><div class="list-group-title i">Improvements</div><ul>${s.improvements.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+              ${s.quickWin ? `<div class="quick-win-block"><div class="qw-label">Quick Win</div><div class="qw-text">${esc(s.quickWin)}</div></div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
 
-    setTimeout(() => {
-      document.querySelectorAll('.sec-bar[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
-    }, 150);
+      setTimeout(() => {
+        document.querySelectorAll('.sec-bar[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
+      }, 150);
+    }
+    
+    // Hide suggestions block
+    $('suggestionsBlock').style.display = 'none';
+    
+    // Show lock banner
+    showPartialResultsBanner();
+    
+  } else {
+    // Full mode - show everything
+    
+    // Show Top 3 Priorities
+    if (data.top3Priorities?.length) {
+      $('prioritiesBlock').style.display = 'block';
+      $('prioritiesList').innerHTML = data.top3Priorities.map(p => `
+        <div class="priority-item">
+          <div class="p-rank rank-${p.rank}">${p.rank}</div>
+          <div class="p-content">
+            <div class="p-section">${esc(p.section)}</div>
+            <div class="p-action">${esc(p.action)}</div>
+            ${p.potentialGain ? `<span class="p-gain">${esc(p.potentialGain)}</span>` : ''}
+          </div>
+        </div>`).join('');
+    } else {
+      $('prioritiesBlock').style.display = 'none';
+    }
+
+    // Show all sections
+    if (data.sections?.length) {
+      $('sectionsList').innerHTML = data.sections.map((s, i) => {
+        const pct = s.maxPoints > 0 ? Math.round((s.earnedPoints / s.maxPoints) * 100) : Math.round(s.score * 10);
+        const cls = scoreClass(s.score);
+        return `
+          <div class="section-card" id="sc${i}">
+            <div class="section-header">
+              <div class="sec-name-wrap">
+                <div class="sec-name">${esc(s.name)}</div>
+                <div class="sec-pts">${(s.earnedPoints||0).toFixed(1)} / ${s.maxPoints} pts</div>
+              </div>
+              <div class="sec-bar-wrap"><div class="sec-bar ${cls}" data-pct="${pct}" style="width:0%"></div></div>
+              <div class="sec-score ${cls}">${(s.score||0).toFixed(1)}</div>
+              <svg class="sec-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="section-body">
+              ${s.strengths?.length ? `<div class="list-group"><div class="list-group-title s">Strengths</div><ul>${s.strengths.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+              ${s.improvements?.length ? `<div class="list-group"><div class="list-group-title i">Improvements</div><ul>${s.improvements.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+              ${s.quickWin ? `<div class="quick-win-block"><div class="qw-label">Quick Win</div><div class="qw-text">${esc(s.quickWin)}</div></div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      setTimeout(() => {
+        document.querySelectorAll('.sec-bar[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
+      }, 150);
+    }
+    
+    // Hide suggestions block (will be shown by renderSuggestions if data exists)
+    $('suggestionsBlock').style.display = 'none';
+    
+    // Hide lock banner if it exists
+    hidePartialResultsBanner();
   }
 }
 
@@ -1283,6 +1514,42 @@ function getInputHash() {
   };
   return hashStr(JSON.stringify(inputs));
 }
+
+// ── Debug Functions (for testing) ────────────────────────────────────────
+/**
+ * Debug function to test partial results logic by simulating different scan counts.
+ * This can be called from the browser console during development.
+ */
+window.testPartialResults = function(scanCount) {
+  if (typeof scanCount === 'number') {
+    analysisCount = scanCount;
+    updateUsageBar();
+    
+    // Re-render current results if available
+    if (lastResultData) {
+      renderResults(lastResultData);
+    }
+  }
+};
+
+/**
+ * Debug function to toggle unlimited scans mode.
+ * This can be called from the browser console during development.
+ */
+window.toggleUnlimitedScans = function() {
+  devUnlimited = !devUnlimited;
+  
+  // Re-render current results if available
+  if (lastResultData) {
+    renderResults(lastResultData);
+  }
+  
+  // Update upload card visibility
+  const uploadCard = $('uploadCard');
+  if (uploadCard) {
+    uploadCard.style.display = (shouldShowPartialResults() || shouldHidePdfUploads()) ? 'none' : 'block';
+  }
+};
 
 // ── Start ──────────────────────────────────────────────────────────────────
 init();

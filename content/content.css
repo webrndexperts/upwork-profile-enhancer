@@ -1,6 +1,6 @@
-/* content.css - RND Upwork Profile Optimizer injected styles */
+/* content.css - Upwork Profile Optimizer - Upliftio injected styles */
 
-#rnd-optimizer-btn {
+#upliftio-optimizer-btn {
   position: fixed;
   bottom: 28px;
   right: 28px;
@@ -12,12 +12,12 @@
   font-family: -apple-system, 'Segoe UI', sans-serif;
 }
 
-#rnd-optimizer-btn.rnd-btn-visible {
+#upliftio-optimizer-btn.upliftio-btn-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
 
-.rnd-btn-inner {
+.upliftio-btn-inner {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -33,17 +33,24 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-#rnd-optimizer-btn:hover .rnd-btn-inner {
+.upliftio-btn-icon {
+  width: 22px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+#upliftio-optimizer-btn:hover .upliftio-btn-inner {
   box-shadow: 0 6px 28px rgba(49, 179, 229, 0.6), 0 4px 12px rgba(0,0,0,0.2);
   transform: translateY(-1px);
 }
 
-#rnd-optimizer-btn:active .rnd-btn-inner {
+#upliftio-optimizer-btn:active .upliftio-btn-inner {
   transform: translateY(0px) scale(0.97);
 }
 
 /* Overlay */
-#rnd-overlay {
+#upliftio-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0);
@@ -52,13 +59,13 @@
   pointer-events: none;
 }
 
-#rnd-overlay.rnd-overlay-visible {
+#upliftio-overlay.upliftio-overlay-visible {
   background: rgba(0, 0, 0, 0.35);
   pointer-events: auto;
 }
 
 /* Sidebar iframe */
-#rnd-sidebar-frame {
+#upliftio-sidebar-frame {
   position: fixed;
   top: 0;
   right: 0;
@@ -71,13 +78,13 @@
   box-shadow: -8px 0 40px rgba(0,0,0,0.18);
 }
 
-#rnd-sidebar-frame.rnd-sidebar-visible {
+#upliftio-sidebar-frame.upliftio-sidebar-visible {
   transform: translateX(0);
 }
 
 /* Push body when sidebar opens */
 @media (min-width: 900px) {
-  body.rnd-sidebar-open {
+  body.upliftio-sidebar-open {
     transition: padding-right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }

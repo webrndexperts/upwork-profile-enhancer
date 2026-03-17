@@ -106,7 +106,7 @@ export async function storeSession(user) {
 
   return new Promise(resolve => {
     chrome.storage.local.set({
-      rnd_user: {
+      upliftio_user: {
         uid: user.uid,
         session: encryptedPayload
       }
@@ -116,8 +116,8 @@ export async function storeSession(user) {
 
 export function getSession() {
   return new Promise(resolve => {
-    chrome.storage.local.get(['rnd_user'], async result => {
-      const data = result.rnd_user;
+    chrome.storage.local.get(['upliftio_user'], async result => {
+      const data = result.upliftio_user;
       if (!data || !data.session) {
         resolve(data || null);
         return;
@@ -144,7 +144,7 @@ export function getSession() {
 
 export function clearSession() {
   return new Promise(resolve => {
-    chrome.storage.local.remove(['rnd_user'], resolve);
+    chrome.storage.local.remove(['upliftio_user'], resolve);
   });
 }
 
