@@ -216,7 +216,9 @@ async function handleGetSettings(sendResponse) {
     ...settings,
     analysisCount,
     freeScanLimit: CONFIG.FREE_SCAN_LIMIT,
+    fullScanLimit: CONFIG.FULL_SCAN_LIMIT,
     upgradeUrl: CONFIG.UPGRADE_URL,
+    contactUsUrl: CONFIG.CONTACT_US_URL,
     devUnlimited: !!CONFIG.DEV_UNLIMITED_SCANS
   });
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "RND Upwork Profile Optimizer",
+  "name": "Upwork Profile Optimizer - Upliftio",
   "version": "1.0.0",
-  "description": "AI-powered Upwork profile analyzer. Get instant scoring and actionable recommendations across 8 key profile sections.",
+  "description": "Optimize your Upwork profile with AI insights. Upliftio shows what’s holding you back and gives clear steps to stand out.",
   "icons": {
     "16": "assets/icons/icon16.png",
     "32": "assets/icons/icon32.png",
@@ -17,7 +17,7 @@
       "48": "assets/icons/icon48.png",
       "128": "assets/icons/icon128.png"
     },
-    "default_title": "RND Upwork Profile Optimizer"
+    "default_title": "Upwork Profile Optimizer - Upliftio"
   },
   "background": {
     "service_worker": "background/background.js",
@@ -38,9 +38,7 @@
     }
   ],
   "permissions": [
-    "activeTab",
     "storage",
-    "scripting",
     "tabs",
     "identity"
   ],

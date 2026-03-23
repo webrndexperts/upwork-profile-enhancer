@@ -1,19 +1,19 @@
-/* auth.css — RND Upwork Profile Optimizer Login Screen */
+/* auth.css — Upwork Profile Optimizer - Upliftio Login Screen */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --brand: #31b3e5;
+  --brand: #4f6ef7;
   --brand-dark: #1a9dd4;
   --brand-glow: rgba(49,179,229,0.2);
   --bg: #111418;
   --bg2: #191d24;
   --bg3: #1f242d;
   --card: #1a1f28;
-  --border: rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.12);
+  --border:#4f6ef7;
+  --border2:#a855f7 ;
   --text: #f0f2f5;
-  --text2: #a0a8b8;
-  --text3: #5a6478;
+  --text2: #f1f1f1;
+  --text3: #ddd;
   --danger: #ef4444;
   --radius: 12px;
   --radius-sm: 8px;
@@ -42,7 +42,7 @@ body {
   justify-content: space-between;
   padding: 13px 16px;
   background: var(--card);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #071e83;
   flex-shrink: 0;
 }
 
@@ -56,13 +56,13 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  /* background: linear-gradient(135deg, var(--brand), var(--brand-dark)); */
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 0 12px var(--brand-glow);
+  /* box-shadow: 0 0 12px var(--brand-glow); */
   flex-shrink: 0;
 }
 .auth-logo img {
@@ -75,10 +75,9 @@ body {
 
 .auth-brand-name {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.2px;
-  line-height: 1.2;
+  line-height:20px;
 }
 .auth-brand-sub {
   font-size: 10px;
@@ -87,9 +86,9 @@ body {
 }
 
 .auth-close-btn {
-  background: none;
+  background: linear-gradient(45deg, #a340f9, #2876e9);
+  color: #fff;  
   border: none;
-  color: var(--text2);
   width: 30px;
   height: 30px;
   border-radius: var(--radius-sm);
@@ -99,7 +98,9 @@ body {
   justify-content: center;
   transition: background 0.15s, color 0.15s;
 }
-.auth-close-btn:hover { background: var(--bg3); color: var(--brand); }
+.auth-close-btn:hover { 
+    background: linear-gradient(234deg, #a340f9, #2876e9);
+}
 
 /* ── Body ── */
 .auth-body {
@@ -129,10 +130,16 @@ body {
 .hero-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1.5px solid rgba(49,179,229,0.15);
+  border: 1.5px solid #ffffff26;
 }
 .hero-ring-1 { width: 90px; height: 90px; animation: rotate 8s linear infinite; }
-.hero-ring-2 { width: 70px; height: 70px; border-color: rgba(49,179,229,0.1); animation: rotate 12s linear infinite reverse; }
+.hero-ring-2 { 
+  width: 70px; 
+  height: 70px; 
+  border-color: #4f6ef7;
+  border-style: dashed;
+  animation: rotate 12s linear infinite reverse; 
+}
 
 @keyframes rotate { to { transform: rotate(360deg); } }
 
@@ -140,7 +147,7 @@ body {
   width: 56px;
   height: 56px;
   background: var(--card);
-  border: 1px solid var(--border2);
+  border: 1px solid #494949;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -186,14 +193,14 @@ body {
 }
 
 .feature-icon {
-  width: 26px;
-  height: 26px;
-  background: rgba(49,179,229,0.1);
+  width: 28px;
+  height: 28px;
+  background:#4f6ef7;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--brand);
+  color:#fff;
   flex-shrink: 0;
 }
 
@@ -205,8 +212,8 @@ body {
   justify-content: center;
   gap: 10px;
   padding: 13px 16px;
-  background: var(--card);
-  border: 1.5px solid var(--border2);
+  border: 1px solid #102388;
+  background: #000b10;
   border-radius: var(--radius);
   color: var(--text);
   font-size: 14px;
@@ -216,8 +223,8 @@ body {
   font-family: inherit;
 }
 .google-btn:hover {
+  background:#04164d !important;
   border-color: rgba(49,179,229,0.4);
-  background: var(--bg3);
   transform: translateY(-1px);
 }
 .google-btn:active { transform: translateY(0); }
@@ -257,7 +264,7 @@ body {
 
 /* ── Terms ── */
 .auth-terms {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text3);
   text-align: center;
   line-height: 1.6;
